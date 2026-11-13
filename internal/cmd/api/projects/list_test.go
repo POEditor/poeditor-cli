@@ -140,3 +140,29 @@ func TestList_accountHint(t *testing.T) {
 		})
 	}
 }
+
+func TestList_piped(t *testing.T) {
+	tests := []struct {
+		name   string
+		result any
+		want   string
+	}{
+		{"tab separated, no header", twoProjects,
+			"7717\tMobile app\tno\tno\t2026-01-14T09:12:44+0000\n4321\tWebsite\tyes\tyes\t2025-06-02T17:03:10+0000\n"},
+		{"empty prints nothing", noProjects, ""},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			fake := testutil.NewFakeAPI(t)
+			fake.Stub("projects/list", testutil.OK(tt.result))
+			env := testutil.NewEnv(t, fake).Login("default", testutil.TestToken)
+			env.TTY = false
+
+			res := env.Run("projects", "list")
+
+			if res.Err != nil || res.Stdout != tt.want {
+				t.Fatalf("got %q, %v; want %q", res.Stdout, res.Err, tt.want)
+			}
+		})
+	}
+}

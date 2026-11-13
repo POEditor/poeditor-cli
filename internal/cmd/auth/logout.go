@@ -13,7 +13,7 @@ import (
 
 // NewCmdLogout returns `poeditor auth logout`.
 func NewCmdLogout(f *cmdutil.Factory) *cobra.Command {
-	return &cobra.Command{
+	cmd := &cobra.Command{
 		Use:   "logout",
 		Short: "Remove an account and its stored token",
 		Long: `Remove an account and its stored token.
@@ -73,4 +73,6 @@ alphabetical order) becomes the default.`,
 			return nil
 		},
 	}
+	cmdutil.MarkAction(cmd)
+	return cmd
 }

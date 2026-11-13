@@ -105,6 +105,7 @@ Tokens are created at ` + TokenPageURL + `.`,
 	}
 
 	cmd.Flags().BoolVar(&withToken, "with-token", false, "Read the token from standard input (no prompt)")
+	cmdutil.MarkAction(cmd)
 	return cmd
 }
 

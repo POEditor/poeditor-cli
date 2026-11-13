@@ -1,0 +1,17 @@
+[
+  {
+    "name": "broken",
+    "default": false,
+    "token": "missing"
+  },
+  {
+    "name": "ci",
+    "default": false,
+    "token": "keyring"
+  },
+  {
+    "name": "personal",
+    "default": true,
+    "token": "keyring"
+  }
+]

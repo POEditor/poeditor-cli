@@ -6,6 +6,7 @@ import (
 	"strings"
 	"testing"
 
+	"github.com/POEditor/poeditor-cli/internal/cmdutil"
 	"github.com/POEditor/poeditor-cli/internal/testutil"
 )
 
@@ -52,6 +53,22 @@ func TestUnknownCommand(t *testing.T) {
 
 	if res.Err == nil || !strings.Contains(res.Err.Error(), `unknown command "nope"`) {
 		t.Fatalf("want unknown command error, got %v", res.Err)
+	}
+}
+
+// Every command declares whether it prints data or performs an action, and
+// every data command offers --json (cmdutil.AddJSONFlag / cmdutil.MarkAction).
+func TestEveryCommandDeclaresItsOutput(t *testing.T) {
+	for _, cmd := range testutil.Leaves() {
+		switch kind := cmd.Annotations[cmdutil.OutputAnnotation]; kind {
+		case cmdutil.OutputData:
+			if cmd.Flags().Lookup("json") == nil {
+				t.Errorf("%q prints data but has no --json flag (use cmdutil.AddJSONFlag)", cmd.CommandPath())
+			}
+		case cmdutil.OutputAction:
+		default:
+			t.Errorf("%q does not declare its output: call cmdutil.AddJSONFlag (data) or cmdutil.MarkAction (action)", cmd.CommandPath())
+		}
 	}
 }
 

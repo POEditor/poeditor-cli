@@ -32,12 +32,13 @@ type Env struct {
 	ConfigDir string
 	Vars      map[string]string // environment variables seen by the CLI
 	Stdin     string
+	TTY       bool // stdout is a terminal (default) or a pipe (false)
 }
 
-// NewEnv returns an Env with no accounts.
+// NewEnv returns an Env with no accounts, stdout a terminal.
 func NewEnv(t testing.TB, fake *FakeAPI) *Env {
 	t.Helper()
-	return &Env{T: t, Fake: fake, Keyring: &keyring.Memory{}, ConfigDir: t.TempDir(), Vars: map[string]string{}}
+	return &Env{T: t, Fake: fake, Keyring: &keyring.Memory{}, ConfigDir: t.TempDir(), Vars: map[string]string{}, TTY: true}
 }
 
 // Login sets up account name with token in the keyring, as `auth login` would.
@@ -77,6 +78,7 @@ func (e *Env) Run(args ...string) Result {
 	e.T.Helper()
 	ios, stdin, stdout, stderr := iostreams.Test()
 	stdin.WriteString(e.Stdin)
+	ios.SetStdoutTTY(e.TTY)
 
 	baseURL := "http://127.0.0.1:1/unreachable/"
 	if e.Fake != nil {

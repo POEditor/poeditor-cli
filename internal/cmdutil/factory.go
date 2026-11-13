@@ -35,7 +35,7 @@ type Factory struct {
 // New returns the factory used by the real binary.
 func New() *Factory {
 	return &Factory{
-		IO:      iostreams.System(),
+		IO:      iostreams.System(os.Getenv),
 		BaseURL: os.Getenv("POEDITOR_API_URL"),
 		Getenv:  os.Getenv,
 		Keyring: keyring.System(),

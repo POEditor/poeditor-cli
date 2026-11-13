@@ -195,3 +195,53 @@ func TestLogout(t *testing.T) {
 		})
 	}
 }
+
+func TestList_json(t *testing.T) {
+	t.Run("accounts", func(t *testing.T) {
+		env := testutil.NewEnv(t, nil).Login("personal", "p").Login("ci", "c")
+		cfg := env.Config()
+		cfg.Accounts["broken"] = &config.Account{}
+		if err := cfg.Save(); err != nil {
+			t.Fatal(err)
+		}
+
+		res := env.Run("auth", "list", "--json")
+
+		if res.Err != nil {
+			t.Fatal(res.Err)
+		}
+		testutil.Golden(t, res.Stdout)
+	})
+
+	t.Run("no accounts is an empty array", func(t *testing.T) {
+		res := testutil.NewEnv(t, nil).Run("auth", "list", "--json")
+
+		if res.Err != nil || res.Stdout != "[]\n" {
+			t.Fatalf("got %q, %v", res.Stdout, res.Err)
+		}
+	})
+}
+
+func TestList_piped(t *testing.T) {
+	t.Run("tab separated, no header", func(t *testing.T) {
+		env := testutil.NewEnv(t, nil).Login("personal", "p").Login("ci", "c")
+		env.TTY = false
+
+		res := env.Run("auth", "list")
+
+		if want := "ci\t\tkeyring\npersonal\tyes\tkeyring\n"; res.Err != nil || res.Stdout != want {
+			t.Fatalf("got %q, %v; want %q", res.Stdout, res.Err, want)
+		}
+	})
+
+	t.Run("no accounts prints nothing", func(t *testing.T) {
+		env := testutil.NewEnv(t, nil)
+		env.TTY = false
+
+		res := env.Run("auth", "list")
+
+		if res.Err != nil || res.Stdout != "" {
+			t.Fatalf("got %q, %v", res.Stdout, res.Err)
+		}
+	})
+}

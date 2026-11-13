@@ -1,10 +1,9 @@
 package projects
 
 import (
-	"encoding/json"
 	"fmt"
+	"strconv"
 	"strings"
-	"text/tabwriter"
 
 	"github.com/spf13/cobra"
 
@@ -49,30 +48,29 @@ func NewCmdList(f *cmdutil.Factory) *cobra.Command {
 		},
 	}
 
-	cmd.Flags().BoolVar(&asJSON, "json", false, "Output the projects as JSON")
+	cmdutil.AddJSONFlag(cmd, &asJSON)
 	return cmd
 }
 
 func printProjects(f *cmdutil.Factory, projects []Project, asJSON bool) error {
 	if asJSON {
-		enc := json.NewEncoder(f.IO.Out)
-		enc.SetIndent("", "  ")
 		if projects == nil {
 			projects = []Project{}
 		}
-		return enc.Encode(projects)
+		return cmdutil.PrintJSON(f.IO, projects)
 	}
 
 	if len(projects) == 0 {
-		fmt.Fprintln(f.IO.Out, "No projects found.")
+		if f.IO.IsStdoutTTY() {
+			fmt.Fprintln(f.IO.Out, "No projects found.")
+		}
 		return nil
 	}
-	w := tabwriter.NewWriter(f.IO.Out, 0, 0, 2, ' ', 0)
-	fmt.Fprintln(w, "ID\tNAME\tPUBLIC\tOPEN\tCREATED")
+	table := cmdutil.NewTable(f.IO, "ID", "NAME", "PUBLIC", "OPEN", "CREATED")
 	for _, p := range projects {
-		fmt.Fprintf(w, "%d\t%s\t%s\t%s\t%s\n", p.ID, p.Name, yesNo(p.Public), yesNo(p.Open), p.Created)
+		table.AddRow(strconv.Itoa(p.ID), p.Name, yesNo(p.Public), yesNo(p.Open), p.Created)
 	}
-	return w.Flush()
+	return table.Render()
 }
 
 // accountHint tells users with several accounts whose projects they see. It

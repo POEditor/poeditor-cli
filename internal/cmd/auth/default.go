@@ -11,7 +11,7 @@ import (
 
 // NewCmdDefault returns `poeditor auth default <account>`.
 func NewCmdDefault(f *cmdutil.Factory) *cobra.Command {
-	return &cobra.Command{
+	cmd := &cobra.Command{
 		Use:   "default <account>",
 		Short: "Set the account used when no --account is given",
 		Args:  cobra.ExactArgs(1),
@@ -35,4 +35,6 @@ func NewCmdDefault(f *cmdutil.Factory) *cobra.Command {
 			return nil
 		},
 	}
+	cmdutil.MarkAction(cmd)
+	return cmd
 }
