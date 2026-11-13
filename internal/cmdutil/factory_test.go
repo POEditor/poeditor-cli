@@ -1,8 +1,10 @@
 package cmdutil_test
 
 import (
+	"context"
 	"errors"
 	"testing"
+	"time"
 
 	"github.com/POEditor/poeditor-cli/internal/accounts"
 	"github.com/POEditor/poeditor-cli/internal/api"
@@ -122,5 +124,20 @@ func TestWorkingDir(t *testing.T) {
 func TestPrompt_notInteractive(t *testing.T) {
 	if _, err := factory(t, nil).Prompt(); !errors.Is(err, cmdutil.ErrNotInteractive) {
 		t.Fatalf("got %v", err)
+	}
+}
+
+func TestSleep(t *testing.T) {
+	if err := cmdutil.Sleep(context.Background(), time.Millisecond); err != nil {
+		t.Fatal(err)
+	}
+	ctx, cancel := context.WithCancel(context.Background())
+	cancel()
+	start := time.Now()
+	if err := cmdutil.Sleep(ctx, time.Hour); !errors.Is(err, context.Canceled) {
+		t.Fatalf("got %v", err)
+	}
+	if time.Since(start) > time.Second {
+		t.Error("a cancelled sleep must return at once")
 	}
 }

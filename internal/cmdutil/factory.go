@@ -5,8 +5,10 @@
 package cmdutil
 
 import (
+	"context"
 	"errors"
 	"os"
+	"time"
 
 	"golang.org/x/term"
 
@@ -39,6 +41,8 @@ type Factory struct {
 	Keyring keyring.Keyring
 	// Prompter asks questions; nil when stdin/stderr are not a terminal.
 	Prompter prompt.Prompter
+	// Sleep waits d or until ctx ends (tests record the waits instead).
+	Sleep func(ctx context.Context, d time.Duration) error
 
 	cfg *config.Config
 }
@@ -50,11 +54,24 @@ func New() *Factory {
 		BaseURL: os.Getenv("POEDITOR_API_URL"),
 		Getenv:  os.Getenv,
 		Keyring: keyring.System(),
+		Sleep:   Sleep,
 	}
 	if term.IsTerminal(int(os.Stdin.Fd())) && term.IsTerminal(int(os.Stderr.Fd())) {
 		f.Prompter = prompt.Huh{In: os.Stdin, Out: os.Stderr}
 	}
 	return f
+}
+
+// Sleep waits d, or returns early with ctx's error (Ctrl+C).
+func Sleep(ctx context.Context, d time.Duration) error {
+	timer := time.NewTimer(d)
+	defer timer.Stop()
+	select {
+	case <-timer.C:
+		return nil
+	case <-ctx.Done():
+		return ctx.Err()
+	}
 }
 
 // Prompt returns the prompter, or ErrNotInteractive.

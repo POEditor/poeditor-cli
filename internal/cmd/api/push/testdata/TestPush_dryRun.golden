@@ -1,0 +1,5 @@
+would upload   locales/en.json (en)  updating=terms_translations, overwrite, sync_terms, tags={"all":["web"],"new":["fresh"]}
+missing        locales/de.json
+would upload   locales/fr.json (fr)  updating=translations, overwrite, tags={"all":["web"],"new":["fresh"]}
+would upload   emails/fr.po (fr)  updating=translations
+3 files would be uploaded (dry run: nothing was sent); 1 missing locally

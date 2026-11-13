@@ -1,12 +1,14 @@
 package testutil
 
 import (
+	"context"
 	"os"
 	"path/filepath"
 	"sort"
 	"strings"
 	"sync"
 	"testing"
+	"time"
 
 	"github.com/spf13/cobra"
 	"github.com/spf13/pflag"
@@ -38,6 +40,8 @@ type Env struct {
 	WorkDir   string // the "current directory" (default: a temp dir)
 	// Prompter answers prompts; nil means not interactive. Use Answer().
 	Prompter *Prompter
+	// Sleeps records every wait the command asked for; nobody actually waits.
+	Sleeps []time.Duration
 }
 
 // Answer makes the run interactive, answering prompts from answers in order.
@@ -114,6 +118,10 @@ func (e *Env) Run(args ...string) Result {
 	}
 	if e.Prompter != nil {
 		f.Prompter = e.Prompter
+	}
+	f.Sleep = func(_ context.Context, d time.Duration) error {
+		e.Sleeps = append(e.Sleeps, d)
+		return nil
 	}
 
 	cmd := root.NewCmdRoot(f)

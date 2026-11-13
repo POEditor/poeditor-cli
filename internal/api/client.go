@@ -5,10 +5,12 @@
 package api
 
 import (
+	"bytes"
 	"context"
 	"encoding/json"
 	"fmt"
 	"io"
+	"mime/multipart"
 	"net/http"
 	"net/url"
 	"strings"
@@ -66,13 +68,44 @@ func (c *Client) Post(ctx context.Context, endpoint string, params url.Values, r
 		form[key] = values
 	}
 	form.Set("api_token", c.Token)
+	return c.do(ctx, endpoint, "application/x-www-form-urlencoded", strings.NewReader(form.Encode()), result)
+}
 
-	endpointURL := strings.TrimRight(c.BaseURL, "/") + "/" + strings.TrimLeft(endpoint, "/")
-	req, err := http.NewRequestWithContext(ctx, http.MethodPost, endpointURL, strings.NewReader(form.Encode()))
+// Upload calls endpoint as multipart/form-data with params plus one file in
+// the form field "file" (projects/upload).
+func (c *Client) Upload(ctx context.Context, endpoint string, params url.Values, fileName string, data []byte, result any) error {
+	var body bytes.Buffer
+	mw := multipart.NewWriter(&body)
+	for key, values := range params {
+		for _, v := range values {
+			if err := mw.WriteField(key, v); err != nil {
+				return err
+			}
+		}
+	}
+	if err := mw.WriteField("api_token", c.Token); err != nil {
+		return err
+	}
+	part, err := mw.CreateFormFile("file", fileName)
 	if err != nil {
 		return err
 	}
-	req.Header.Set("Content-Type", "application/x-www-form-urlencoded")
+	if _, err := part.Write(data); err != nil {
+		return err
+	}
+	if err := mw.Close(); err != nil {
+		return err
+	}
+	return c.do(ctx, endpoint, mw.FormDataContentType(), &body, result)
+}
+
+func (c *Client) do(ctx context.Context, endpoint, contentType string, reqBody io.Reader, result any) error {
+	endpointURL := strings.TrimRight(c.BaseURL, "/") + "/" + strings.TrimLeft(endpoint, "/")
+	req, err := http.NewRequestWithContext(ctx, http.MethodPost, endpointURL, reqBody)
+	if err != nil {
+		return err
+	}
+	req.Header.Set("Content-Type", contentType)
 	if c.UserAgent != "" {
 		req.Header.Set("User-Agent", c.UserAgent)
 	}

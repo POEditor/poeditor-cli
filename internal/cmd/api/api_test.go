@@ -20,7 +20,7 @@ func TestModuleCommands(t *testing.T) {
 		}
 		names[cmd.Name()] = true
 	}
-	for _, want := range []string{"projects", "pull"} {
+	for _, want := range []string{"projects", "pull", "push"} {
 		if !names[want] {
 			t.Errorf("%s missing from the api module; got %v", want, names)
 		}

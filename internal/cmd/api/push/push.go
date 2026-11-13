@@ -1,0 +1,372 @@
+// Package push is `poeditor push`: upload the source-language files of
+// .poeditor.yml (and, with --translations, every other language).
+package push
+
+import (
+	"errors"
+	"fmt"
+	"io/fs"
+	"net/url"
+	"os"
+	"path/filepath"
+	"slices"
+	"strconv"
+	"strings"
+	"time"
+
+	"github.com/spf13/cobra"
+
+	"github.com/POEditor/poeditor-cli/internal/api"
+	"github.com/POEditor/poeditor-cli/internal/cmdutil"
+	"github.com/POEditor/poeditor-cli/internal/repoconfig"
+	"github.com/POEditor/poeditor-cli/internal/transfer"
+)
+
+const (
+	// UploadDelay is the wait between uploads: the paid-plan limit. Free
+	// accounts (20s) get the rest through the 4048 retries.
+	UploadDelay = 10 * time.Second
+	// MaxRetries is how many times one upload is retried after 4048.
+	MaxRetries = 3
+	// tooManyUploads is the API's "Too many upload requests" code.
+	tooManyUploads = "4048"
+)
+
+// Statuses.
+const (
+	Uploaded    = "uploaded"
+	Missing     = "missing"
+	WouldUpload = "would_upload"
+)
+
+// Counts are what one upload changed.
+type Counts struct {
+	Terms *struct {
+		Parsed  int `json:"parsed"`
+		Added   int `json:"added"`
+		Deleted int `json:"deleted"`
+	} `json:"terms,omitempty"`
+	Translations *struct {
+		Parsed  int `json:"parsed"`
+		Added   int `json:"added"`
+		Updated int `json:"updated"`
+	} `json:"translations,omitempty"`
+}
+
+// Result is one file in one language, as reported by --json.
+type Result struct {
+	Project  transfer.ProjectRef `json:"project"`
+	File     string              `json:"file"`
+	Language string              `json:"language"`
+	Status   string              `json:"status"`
+	Counts
+}
+
+// upload is one planned upload.
+type upload struct {
+	transfer.Item
+	client   *api.Client
+	updating string
+	source   bool
+}
+
+// NewCmdPush returns `poeditor push`.
+func NewCmdPush(f *cmdutil.Factory) *cobra.Command {
+	var (
+		project      string
+		languages    []string
+		translations bool
+		dryRun       bool
+		asJSON       bool
+	)
+
+	cmd := &cobra.Command{
+		Use:   "push",
+		Short: "Upload the source files of " + repoconfig.FileName + " to POEditor",
+		Long: `Upload the source files of ` + repoconfig.FileName + ` to POEditor.
+
+By default only the source_language file of each file entry is uploaded, with
+updating=terms_translations: new and changed terms plus their source text.
+With --translations every other language is uploaded too, with
+updating=translations, so a translation file never creates terms; whether
+existing translations are overwritten follows push.overwrite. A translation
+file that does not exist locally is skipped.
+
+POEditor accepts one upload every 10 seconds (20 on free accounts), so push
+waits between uploads and retries when the API says it is too early. Files are
+uploaded one at a time and push stops at the first error. Nothing is uploaded
+if a source file is missing or a format cannot be uploaded.`,
+		Example: `  poeditor push
+  poeditor push --project web
+  poeditor push --translations --language fr
+  poeditor push --dry-run --translations`,
+		Args: cobra.NoArgs,
+		RunE: func(cmd *cobra.Command, _ []string) error {
+			cfg, err := transfer.LoadConfig(f)
+			if err != nil {
+				return err
+			}
+			projects, err := cfg.Select(project)
+			if err != nil {
+				return err
+			}
+			if len(languages) > 0 && !translations {
+				return errors.New("--language only applies with --translations (without it, push uploads the source language only)")
+			}
+
+			plan, err := makePlan(cmd, f, cfg, projects, translations, languages)
+			if err != nil {
+				return err
+			}
+
+			results := []Result{}
+			runErr := func() error {
+				uploads := 0
+				for _, u := range plan {
+					res := Result{Project: transfer.Ref(u.Project), File: u.Display, Language: u.Language}
+					data, err := os.ReadFile(u.Path)
+					if errors.Is(err, fs.ErrNotExist) {
+						res.Status = Missing
+						results = append(results, res)
+						fmt.Fprintf(f.IO.ErrOut, "%-14s %s\n", "missing", u.Display)
+						continue
+					}
+					if err != nil {
+						return &transfer.ErrStopped{Display: u.Display, Err: err}
+					}
+					if dryRun {
+						res.Status = WouldUpload
+						results = append(results, res)
+						fmt.Fprintf(f.IO.ErrOut, "%-14s %s (%s)  %s\n", "would upload", u.Display, u.Language, describe(u))
+						continue
+					}
+					if uploads > 0 {
+						if err := wait(cmd, f, UploadDelay, "before the next upload"); err != nil {
+							return err
+						}
+					}
+					counts, err := send(cmd, f, u, data)
+					if err != nil {
+						return &transfer.ErrStopped{Display: u.Display, Err: err}
+					}
+					uploads++
+					res.Status, res.Counts = Uploaded, counts
+					results = append(results, res)
+					fmt.Fprintf(f.IO.ErrOut, "%-14s %s (%s)  %s\n", "uploaded", u.Display, u.Language, counts)
+				}
+				return nil
+			}()
+
+			if asJSON {
+				if err := cmdutil.PrintJSON(f.IO, results); err != nil {
+					return err
+				}
+			}
+			if runErr != nil {
+				return runErr
+			}
+			fmt.Fprintln(f.IO.ErrOut, summary(results, dryRun))
+			return nil
+		},
+	}
+
+	cmd.Flags().StringVar(&project, "project", "", "Only this project (its alias or id)")
+	cmd.Flags().BoolVar(&translations, "translations", false, "Also upload every other language (updating=translations)")
+	cmd.Flags().StringSliceVar(&languages, "language", nil, "With --translations: only these languages, the source one included only if listed (repeat or comma-separate)")
+	cmd.Flags().BoolVar(&dryRun, "dry-run", false, "List what would be uploaded without uploading")
+	cmdutil.AddJSONFlag(cmd, &asJSON)
+	return cmd
+}
+
+// makePlan lists the uploads and checks, before anything is sent, that each
+// format can be uploaded and every source file exists.
+func makePlan(cmd *cobra.Command, f *cmdutil.Factory, cfg *repoconfig.Config, projects []repoconfig.Project, translations bool, only []string) ([]upload, error) {
+	var plan []upload
+	for _, p := range projects {
+		if p.SourceLanguage == "" {
+			return nil, fmt.Errorf("project %s has no source_language in %s: push needs it to know which file holds the terms", p.Label(), cfg.Path())
+		}
+		for _, file := range p.Files {
+			if format, ok := repoconfig.Formats[file.Format]; ok && !format.Import {
+				return nil, fmt.Errorf("project %s: %s: format %s can be pulled but not pushed", p.Label(), file.Path, file.Format)
+			}
+		}
+		client, err := transfer.Client(f, p)
+		if err != nil {
+			return nil, err
+		}
+
+		langs := []string{p.SourceLanguage}
+		if translations {
+			if langs, err = transfer.ProjectLanguages(cmd.Context(), client, p.ID); err != nil {
+				return nil, fmt.Errorf("project %s: %w", p.Label(), err)
+			}
+		}
+		items, err := transfer.Items(cfg, p, langs, only)
+		if err != nil {
+			return nil, err
+		}
+		// a file's own `languages:` list wins over langs in Items; push keeps
+		// only the languages it plans to send (the source one, by default)
+		items = slices.DeleteFunc(items, func(it transfer.Item) bool { return !slices.Contains(langs, it.Language) })
+
+		// source files first, so terms exist before their translations arrive
+		slices.SortStableFunc(items, func(a, b transfer.Item) int {
+			return boolInt(b.Language == p.SourceLanguage) - boolInt(a.Language == p.SourceLanguage)
+		})
+		for _, item := range items {
+			source := item.Language == p.SourceLanguage
+			if source {
+				if _, err := os.Stat(item.Path); errors.Is(err, fs.ErrNotExist) {
+					return nil, fmt.Errorf("%s: source file not found (project %s, source_language %s); nothing was uploaded", item.Display, p.Label(), p.SourceLanguage)
+				}
+			}
+			updating := "translations"
+			if source {
+				updating = "terms_translations"
+				if item.File.Push != nil && item.File.Push.Updating != "" {
+					updating = item.File.Push.Updating
+				}
+			}
+			plan = append(plan, upload{Item: item, client: client, updating: updating, source: source})
+		}
+	}
+	return plan, nil
+}
+
+// send uploads one file, waiting and retrying while the API says it is too early.
+func send(cmd *cobra.Command, f *cmdutil.Factory, u upload, data []byte) (Counts, error) {
+	params := Params(u.Item, u.updating, u.source)
+	for attempt := 0; ; attempt++ {
+		var counts Counts
+		err := u.client.Upload(cmd.Context(), "projects/upload", params, filepath.Base(u.Path), data, &counts)
+		var apiErr *api.Error
+		if err == nil || !errors.As(err, &apiErr) || apiErr.Code != tooManyUploads {
+			return counts, err
+		}
+		if attempt == MaxRetries {
+			return counts, fmt.Errorf("%w (still refused after %d retries; try again in a minute)", err, MaxRetries)
+		}
+		if err := wait(cmd, f, UploadDelay, "and retrying: POEditor allows one upload every 10–20s"); err != nil {
+			return counts, err
+		}
+	}
+}
+
+// Params are the projects/upload parameters (besides the file and token).
+func Params(item transfer.Item, updating string, source bool) url.Values {
+	params := url.Values{
+		"id":       {strconv.Itoa(item.Project.ID)},
+		"updating": {updating},
+		"language": {item.Language},
+	}
+	push := item.File.Push
+	if push == nil {
+		return params
+	}
+	if push.Overwrite {
+		params.Set("overwrite", "1")
+	}
+	if push.SyncTerms && source {
+		params.Set("sync_terms", "1")
+	}
+	if push.ReadFromSource {
+		params.Set("read_from_source", "1")
+	}
+	if push.FuzzyTrigger {
+		params.Set("fuzzy_trigger", "1")
+	}
+	if tags := tagsJSON(push.Tags); tags != "" {
+		params.Set("tags", tags)
+	}
+	return params
+}
+
+func tagsJSON(t *repoconfig.PushTags) string {
+	if t == nil {
+		return ""
+	}
+	var parts []string
+	for _, group := range []struct {
+		key  string
+		tags []string
+	}{{"all", t.All}, {"new", t.New}, {"obsolete", t.Obsolete}, {"overwritten_translations", t.OverwrittenTranslations}} {
+		if len(group.tags) > 0 {
+			parts = append(parts, strconv.Quote(group.key)+":"+transfer.JSONList(group.tags))
+		}
+	}
+	if len(parts) == 0 {
+		return ""
+	}
+	return "{" + strings.Join(parts, ",") + "}"
+}
+
+func wait(cmd *cobra.Command, f *cmdutil.Factory, d time.Duration, why string) error {
+	fmt.Fprintf(f.IO.ErrOut, "waiting %ds %s…\n", int(d.Seconds()), why)
+	return f.Sleep(cmd.Context(), d)
+}
+
+// describe is the --dry-run detail of an upload.
+func describe(u upload) string {
+	parts := []string{"updating=" + u.updating}
+	if p := u.File.Push; p != nil {
+		if p.Overwrite {
+			parts = append(parts, "overwrite")
+		}
+		if p.SyncTerms && u.source {
+			parts = append(parts, "sync_terms")
+		}
+		if tags := tagsJSON(p.Tags); tags != "" {
+			parts = append(parts, "tags="+tags)
+		}
+	}
+	return strings.Join(parts, ", ")
+}
+
+func (c Counts) String() string {
+	var parts []string
+	if t := c.Terms; t != nil {
+		parts = append(parts, fmt.Sprintf("terms: %d parsed, %d added, %d deleted", t.Parsed, t.Added, t.Deleted))
+	}
+	if t := c.Translations; t != nil {
+		parts = append(parts, fmt.Sprintf("translations: %d added, %d updated", t.Added, t.Updated))
+	}
+	return strings.Join(parts, " · ")
+}
+
+func summary(results []Result, dryRun bool) string {
+	var uploaded, missing, added, deleted int
+	for _, r := range results {
+		switch r.Status {
+		case Uploaded, WouldUpload:
+			uploaded++
+		case Missing:
+			missing++
+		}
+		if r.Terms != nil {
+			added += r.Terms.Added
+			deleted += r.Terms.Deleted
+		}
+	}
+	files := "files"
+	if uploaded == 1 {
+		files = "file"
+	}
+	var line string
+	if dryRun {
+		line = fmt.Sprintf("%d %s would be uploaded (dry run: nothing was sent)", uploaded, files)
+	} else {
+		line = fmt.Sprintf("%d %s uploaded: %d terms added, %d deleted", uploaded, files, added, deleted)
+	}
+	if missing > 0 {
+		line += fmt.Sprintf("; %d missing locally", missing)
+	}
+	return line
+}
+
+func boolInt(b bool) int {
+	if b {
+		return 1
+	}
+	return 0
+}

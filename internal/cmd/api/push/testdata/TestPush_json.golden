@@ -1,0 +1,68 @@
+[
+  {
+    "project": {
+      "id": 1001,
+      "alias": "web"
+    },
+    "file": "locales/en.json",
+    "language": "en",
+    "status": "uploaded",
+    "terms": {
+      "parsed": 10,
+      "added": 2,
+      "deleted": 1
+    },
+    "translations": {
+      "parsed": 10,
+      "added": 2,
+      "updated": 3
+    }
+  },
+  {
+    "project": {
+      "id": 1001,
+      "alias": "web"
+    },
+    "file": "locales/de.json",
+    "language": "de",
+    "status": "missing"
+  },
+  {
+    "project": {
+      "id": 1001,
+      "alias": "web"
+    },
+    "file": "locales/fr.json",
+    "language": "fr",
+    "status": "uploaded",
+    "terms": {
+      "parsed": 10,
+      "added": 2,
+      "deleted": 1
+    },
+    "translations": {
+      "parsed": 10,
+      "added": 2,
+      "updated": 3
+    }
+  },
+  {
+    "project": {
+      "id": 1001,
+      "alias": "web"
+    },
+    "file": "emails/fr.po",
+    "language": "fr",
+    "status": "uploaded",
+    "terms": {
+      "parsed": 10,
+      "added": 2,
+      "deleted": 1
+    },
+    "translations": {
+      "parsed": 10,
+      "added": 2,
+      "updated": 3
+    }
+  }
+]

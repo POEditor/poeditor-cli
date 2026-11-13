@@ -5,6 +5,7 @@ package testutil
 
 import (
 	"encoding/json"
+	"io"
 	"net/http"
 	"net/http/httptest"
 	"net/url"
@@ -20,6 +21,8 @@ const TestToken = "test-token"
 type Request struct {
 	Endpoint string     // e.g. "projects/list"
 	Form     url.Values // includes api_token
+	FileName string     // multipart uploads: the "file" field's name
+	FileData []byte     // and its content
 }
 
 // Stub is a canned API response.
@@ -135,18 +138,33 @@ func (f *FakeAPI) serve(w http.ResponseWriter, r *http.Request) {
 	if r.Method != http.MethodPost {
 		f.t.Errorf("fake API: %s %s, API v2 only accepts POST", r.Method, endpoint)
 	}
-	if err := r.ParseForm(); err != nil {
-		f.t.Errorf("fake API: bad form for %s: %v", endpoint, err)
+	req := Request{Endpoint: endpoint}
+	if strings.HasPrefix(r.Header.Get("Content-Type"), "multipart/form-data") {
+		if err := r.ParseMultipartForm(32 << 20); err != nil {
+			f.t.Errorf("fake API: bad multipart form for %s: %v", endpoint, err)
+		} else {
+			req.Form = url.Values(r.MultipartForm.Value)
+			if file, hdr, err := r.FormFile("file"); err == nil {
+				req.FileName = hdr.Filename
+				req.FileData, _ = io.ReadAll(file)
+				file.Close()
+			}
+		}
+	} else {
+		if err := r.ParseForm(); err != nil {
+			f.t.Errorf("fake API: bad form for %s: %v", endpoint, err)
+		}
+		req.Form = r.PostForm
 	}
 
 	f.mu.Lock()
-	f.requests = append(f.requests, Request{Endpoint: endpoint, Form: r.PostForm})
+	f.requests = append(f.requests, req)
 	stubFn, ok := f.stubs[endpoint]
 	f.mu.Unlock()
 
 	var stub Stub
 	if ok {
-		stub = stubFn(r.PostForm)
+		stub = stubFn(req.Form)
 	} else {
 		f.t.Errorf("fake API: no stub for endpoint %q", endpoint)
 		stub = Fail("404", "endpoint not stubbed in test")

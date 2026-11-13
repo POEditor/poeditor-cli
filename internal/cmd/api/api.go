@@ -8,6 +8,7 @@ import (
 
 	"github.com/POEditor/poeditor-cli/internal/cmd/api/projects"
 	"github.com/POEditor/poeditor-cli/internal/cmd/api/pull"
+	"github.com/POEditor/poeditor-cli/internal/cmd/api/push"
 	"github.com/POEditor/poeditor-cli/internal/cmdutil"
 )
 
@@ -19,6 +20,7 @@ var Module = cmdutil.Module{
 		return []*cobra.Command{
 			projects.NewCmdProjects(f),
 			pull.NewCmdPull(f),
+			push.NewCmdPush(f),
 		}
 	},
 }

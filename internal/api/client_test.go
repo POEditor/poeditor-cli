@@ -121,3 +121,40 @@ func TestDownload(t *testing.T) {
 		t.Errorf("404: %v", err)
 	}
 }
+
+func TestUpload_multipart(t *testing.T) {
+	var gotForm url.Values
+	var gotFile, gotName string
+	client := server(t, func(w http.ResponseWriter, r *http.Request) {
+		if err := r.ParseMultipartForm(1 << 20); err != nil {
+			t.Errorf("not multipart: %v", err)
+		}
+		gotForm = url.Values(r.MultipartForm.Value)
+		f, hdr, err := r.FormFile("file")
+		if err != nil {
+			t.Errorf("no file: %v", err)
+		} else {
+			data, _ := io.ReadAll(f)
+			gotFile, gotName = string(data), hdr.Filename
+		}
+		io.WriteString(w, `{"response":{"status":"success","code":"200","message":"OK"},"result":{"terms":{"added":2}}}`)
+	})
+	var result struct {
+		Terms struct{ Added int } `json:"terms"`
+	}
+
+	err := client.Upload(context.Background(), "projects/upload", url.Values{"id": {"7"}, "updating": {"terms"}}, "en.json", []byte(`{"a":"b"}`), &result)
+
+	if err != nil {
+		t.Fatal(err)
+	}
+	if gotForm.Get("api_token") != "tok" || gotForm.Get("id") != "7" || gotForm.Get("updating") != "terms" {
+		t.Errorf("fields = %v", gotForm)
+	}
+	if gotFile != `{"a":"b"}` || gotName != "en.json" {
+		t.Errorf("file %q named %q", gotFile, gotName)
+	}
+	if result.Terms.Added != 2 {
+		t.Errorf("result = %+v", result)
+	}
+}
