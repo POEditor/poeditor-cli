@@ -2,16 +2,18 @@ package testutil
 
 import (
 	"sort"
+	"strings"
 	"sync"
 	"testing"
 
 	"github.com/spf13/cobra"
 	"github.com/spf13/pflag"
 
-	"github.com/POEditor/poeditor-cli/internal/api"
 	"github.com/POEditor/poeditor-cli/internal/cmd/root"
 	"github.com/POEditor/poeditor-cli/internal/cmdutil"
+	"github.com/POEditor/poeditor-cli/internal/config"
 	"github.com/POEditor/poeditor-cli/internal/iostreams"
+	"github.com/POEditor/poeditor-cli/internal/keyring"
 )
 
 // Result is what a command run produced.
@@ -21,21 +23,71 @@ type Result struct {
 	Err    error
 }
 
-// Run executes `poeditor <args...>` through the real root command, with the
-// API pointed at fake. A nil fake means "no token configured".
-// Every run is recorded for the option-coverage check (see Main).
-func Run(t testing.TB, fake *FakeAPI, args ...string) Result {
-	t.Helper()
-	ios, _, stdout, stderr := iostreams.Test()
+// Env is an isolated machine for one test: its own config dir, in-memory
+// keyring, environment variables and stdin, with the API pointed at Fake.
+type Env struct {
+	T         testing.TB
+	Fake      *FakeAPI // nil: the API is unreachable
+	Keyring   *keyring.Memory
+	ConfigDir string
+	Vars      map[string]string // environment variables seen by the CLI
+	Stdin     string
+}
 
+// NewEnv returns an Env with no accounts.
+func NewEnv(t testing.TB, fake *FakeAPI) *Env {
+	t.Helper()
+	return &Env{T: t, Fake: fake, Keyring: &keyring.Memory{}, ConfigDir: t.TempDir(), Vars: map[string]string{}}
+}
+
+// Login sets up account name with token in the keyring, as `auth login` would.
+// The first account becomes the default.
+func (e *Env) Login(name, token string) *Env {
+	e.T.Helper()
+	cfg := e.Config()
+	if cfg.Accounts == nil {
+		cfg.Accounts = map[string]*config.Account{}
+	}
+	cfg.Accounts[name] = &config.Account{}
+	if cfg.DefaultAccount == "" {
+		cfg.DefaultAccount = name
+	}
+	if err := cfg.Save(); err != nil {
+		e.T.Fatal(err)
+	}
+	if err := e.Keyring.Set(name, token); err != nil {
+		e.T.Fatal(err)
+	}
+	return e
+}
+
+// Config reads the config file as it is on disk now.
+func (e *Env) Config() *config.Config {
+	e.T.Helper()
+	cfg, err := config.Load(e.ConfigDir)
+	if err != nil {
+		e.T.Fatal(err)
+	}
+	return cfg
+}
+
+// Run executes `poeditor <args...>` through the real root command.
+// Every run is recorded for the option-coverage check (see Main).
+func (e *Env) Run(args ...string) Result {
+	e.T.Helper()
+	ios, stdin, stdout, stderr := iostreams.Test()
+	stdin.WriteString(e.Stdin)
+
+	baseURL := "http://127.0.0.1:1/unreachable/"
+	if e.Fake != nil {
+		baseURL = e.Fake.URL
+	}
 	f := &cmdutil.Factory{
-		IO: ios,
-		APIClient: func() (*api.Client, error) {
-			if fake == nil {
-				return nil, cmdutil.ErrNoToken
-			}
-			return api.NewClient(fake.URL, TestToken, "poeditor-cli/test"), nil
-		},
+		IO:        ios,
+		BaseURL:   baseURL,
+		ConfigDir: e.ConfigDir,
+		Getenv:    func(k string) string { return e.Vars[k] },
+		Keyring:   e.Keyring,
 	}
 
 	cmd := root.NewCmdRoot(f)
@@ -45,6 +97,22 @@ func Run(t testing.TB, fake *FakeAPI, args ...string) Result {
 		record(executed)
 	}
 	return Result{Stdout: stdout.String(), Stderr: stderr.String(), Err: err}
+}
+
+// Run is the short form for commands that just need to be logged in: one
+// account "default" with TestToken against fake. A nil fake means no account.
+func Run(t testing.TB, fake *FakeAPI, args ...string) Result {
+	t.Helper()
+	env := NewEnv(t, fake)
+	if fake != nil {
+		env.Login("default", TestToken)
+	}
+	return env.Run(args...)
+}
+
+// Lines splits output into trimmed lines, for asserting on stderr messages.
+func Lines(s string) []string {
+	return strings.Split(strings.TrimRight(s, "\n"), "\n")
 }
 
 var (

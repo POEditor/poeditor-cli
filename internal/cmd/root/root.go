@@ -6,15 +6,17 @@ import (
 
 	"github.com/POEditor/poeditor-cli/internal/build"
 	apicmd "github.com/POEditor/poeditor-cli/internal/cmd/api"
+	"github.com/POEditor/poeditor-cli/internal/cmd/auth"
 	"github.com/POEditor/poeditor-cli/internal/cmdutil"
 )
 
 // topLevel is the module whose commands sit directly under `poeditor`.
 var topLevel = apicmd.Module
 
-// modules are attached as `poeditor <module.Name> <command>`, e.g. a future
-// parser module: {Name: "parser", Short: "...", Commands: parser.Commands}.
-var modules = []cmdutil.Module{}
+// modules are attached as `poeditor <module.Name> <command>`.
+var modules = []cmdutil.Module{
+	auth.Module,
+}
 
 // NewCmdRoot returns the root command with every module attached.
 // It panics on a command-name clash: that is a programming error, and the
@@ -32,6 +34,7 @@ func NewCmdRoot(f *cmdutil.Factory) *cobra.Command {
 	cmd.SetOut(f.IO.Out)
 	cmd.SetErr(f.IO.ErrOut)
 	cmd.CompletionOptions.HiddenDefaultCmd = true
+	cmd.PersistentFlags().StringVar(&f.Account, "account", "", "Account to use (default: your default account)")
 
 	must(cmdutil.AddUnique(cmd, topLevel.Commands(f)...))
 	for _, m := range modules {

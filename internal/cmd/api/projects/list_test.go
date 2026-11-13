@@ -5,8 +5,8 @@ import (
 	"strings"
 	"testing"
 
+	"github.com/POEditor/poeditor-cli/internal/accounts"
 	"github.com/POEditor/poeditor-cli/internal/api"
-	"github.com/POEditor/poeditor-cli/internal/cmdutil"
 	"github.com/POEditor/poeditor-cli/internal/testutil"
 )
 
@@ -78,8 +78,8 @@ func TestList_apiError(t *testing.T) {
 func TestList_noToken(t *testing.T) {
 	res := testutil.Run(t, nil, "projects", "list")
 
-	if !errors.Is(res.Err, cmdutil.ErrNoToken) {
-		t.Fatalf("want ErrNoToken, got %v", res.Err)
+	if !errors.Is(res.Err, accounts.ErrNotLoggedIn) {
+		t.Fatalf("want ErrNotLoggedIn, got %v", res.Err)
 	}
 }
 
@@ -93,5 +93,50 @@ func TestList_rejectsArguments(t *testing.T) {
 	}
 	if n := len(fake.Requests()); n != 0 {
 		t.Errorf("no API call expected, got %d", n)
+	}
+}
+
+func TestList_accountHint(t *testing.T) {
+	tests := []struct {
+		name       string
+		accounts   []string // first = default
+		args       []string
+		wantToken  string
+		wantStderr string
+	}{
+		{"one account: no hint", []string{"default"}, []string{"projects", "list"}, "default-tok", ""},
+		{"two accounts", []string{"default", "client-a"}, []string{"projects", "list"}, "default-tok",
+			"\nAccount: default (also logged in: client-a — use --account client-a)\n"},
+		{"--account picks the other", []string{"default", "client-a"}, []string{"projects", "list", "--account", "client-a"}, "client-a-tok",
+			"\nAccount: client-a (also logged in: default — use --account default)\n"},
+		{"three accounts", []string{"default", "b", "c"}, []string{"projects", "list"}, "default-tok",
+			"\nAccount: default (also logged in: b, c — use --account <name>)\n"},
+		{"json keeps stdout clean", []string{"default", "client-a"}, []string{"projects", "list", "--json"}, "default-tok",
+			"\nAccount: default (also logged in: client-a — use --account client-a)\n"},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			fake := testutil.NewFakeAPI(t)
+			fake.Stub("projects/list", testutil.OK(noProjects))
+			env := testutil.NewEnv(t, fake)
+			for _, name := range tt.accounts {
+				env.Login(name, name+"-tok")
+			}
+
+			res := env.Run(tt.args...)
+
+			if res.Err != nil {
+				t.Fatal(res.Err)
+			}
+			if got := fake.OnlyRequest(t).Form.Get("api_token"); got != tt.wantToken {
+				t.Errorf("api_token = %q, want %q", got, tt.wantToken)
+			}
+			if res.Stderr != tt.wantStderr {
+				t.Errorf("stderr = %q, want %q", res.Stderr, tt.wantStderr)
+			}
+			if strings.Contains(res.Stdout, "Account:") {
+				t.Errorf("hint leaked into stdout: %q", res.Stdout)
+			}
+		})
 	}
 }
