@@ -44,16 +44,18 @@ func Fail(code, message string) Stub {
 type FakeAPI struct {
 	URL string
 
-	t        testing.TB
-	mu       sync.Mutex
-	stubs    map[string]func(url.Values) Stub
-	requests []Request
+	t         testing.TB
+	mu        sync.Mutex
+	stubs     map[string]func(url.Values) Stub
+	requests  []Request
+	files     map[string][]byte // download name → content
+	downloads []string          // download names fetched, in order
 }
 
 // NewFakeAPI starts a fake API that is closed when the test ends.
 func NewFakeAPI(t testing.TB) *FakeAPI {
 	t.Helper()
-	fake := &FakeAPI{t: t, stubs: map[string]func(url.Values) Stub{}}
+	fake := &FakeAPI{t: t, stubs: map[string]func(url.Values) Stub{}, files: map[string][]byte{}}
 	server := httptest.NewServer(http.HandlerFunc(fake.serve))
 	t.Cleanup(server.Close)
 	fake.URL = server.URL + "/v2/"
@@ -76,7 +78,30 @@ func (f *FakeAPI) StubFunc(endpoint string, fn func(form url.Values) Stub) {
 	f.stubs[endpoint] = fn
 }
 
-// Requests returns every request received so far, in order.
+// File registers a downloadable file and returns its URL, as projects/export
+// would hand it out. An URL from FileURL whose name was never registered
+// answers 404, like an expired link.
+func (f *FakeAPI) File(name string, content []byte) string {
+	f.mu.Lock()
+	defer f.mu.Unlock()
+	f.files[name] = content
+	return f.FileURL(name)
+}
+
+// FileURL is the download URL for name.
+func (f *FakeAPI) FileURL(name string) string {
+	return strings.TrimSuffix(f.URL, "v2/") + "files/" + url.PathEscape(name)
+}
+
+// Downloads returns the names of the files downloaded so far, in order.
+func (f *FakeAPI) Downloads() []string {
+	f.mu.Lock()
+	defer f.mu.Unlock()
+	return append([]string(nil), f.downloads...)
+}
+
+// Requests returns every API request received so far, in order (downloads
+// are not API requests: see Downloads).
 func (f *FakeAPI) Requests() []Request {
 	f.mu.Lock()
 	defer f.mu.Unlock()
@@ -94,6 +119,18 @@ func (f *FakeAPI) OnlyRequest(t testing.TB) Request {
 }
 
 func (f *FakeAPI) serve(w http.ResponseWriter, r *http.Request) {
+	if name, ok := strings.CutPrefix(r.URL.Path, "/files/"); ok {
+		f.mu.Lock()
+		content, found := f.files[name]
+		f.downloads = append(f.downloads, name)
+		f.mu.Unlock()
+		if !found {
+			http.Error(w, "file expired", http.StatusNotFound)
+			return
+		}
+		_, _ = w.Write(content)
+		return
+	}
 	endpoint := strings.TrimPrefix(r.URL.Path, "/v2/")
 	if r.Method != http.MethodPost {
 		f.t.Errorf("fake API: %s %s, API v2 only accepts POST", r.Method, endpoint)

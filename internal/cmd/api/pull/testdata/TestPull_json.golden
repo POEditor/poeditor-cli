@@ -1,0 +1,37 @@
+[
+  {
+    "project": {
+      "id": 1001,
+      "alias": "web"
+    },
+    "file": "locales/en.json",
+    "language": "en",
+    "status": "unchanged"
+  },
+  {
+    "project": {
+      "id": 1001,
+      "alias": "web"
+    },
+    "file": "locales/fr.json",
+    "language": "fr",
+    "status": "created"
+  },
+  {
+    "project": {
+      "id": 1001,
+      "alias": "web"
+    },
+    "file": "locales/pt-BR.json",
+    "language": "pt-br",
+    "status": "created"
+  },
+  {
+    "project": {
+      "id": 2002
+    },
+    "file": "emails/en.po",
+    "language": "en",
+    "status": "created"
+  }
+]

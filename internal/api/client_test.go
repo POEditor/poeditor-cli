@@ -94,3 +94,30 @@ func TestNewClient_defaultsToProduction(t *testing.T) {
 		t.Errorf("BaseURL = %q", c.BaseURL)
 	}
 }
+
+func TestDownload(t *testing.T) {
+	var gotToken, gotMethod string
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		gotMethod, gotToken = r.Method, r.URL.Query().Get("api_token")
+		if r.URL.Path == "/gone" {
+			w.WriteHeader(http.StatusNotFound)
+			io.WriteString(w, "expired")
+			return
+		}
+		io.WriteString(w, `{"hello":"world"}`)
+	}))
+	t.Cleanup(srv.Close)
+	client := api.NewClient(srv.URL+"/v2/", "tok", "ua")
+
+	body, err := client.Download(context.Background(), srv.URL+"/file")
+
+	if err != nil || string(body) != `{"hello":"world"}` {
+		t.Fatalf("got %q, %v", body, err)
+	}
+	if gotMethod != http.MethodGet || gotToken != "" {
+		t.Errorf("method %s, token %q: want a plain GET without the token", gotMethod, gotToken)
+	}
+	if _, err := client.Download(context.Background(), srv.URL+"/gone"); err == nil || !strings.Contains(err.Error(), "HTTP 404") {
+		t.Errorf("404: %v", err)
+	}
+}

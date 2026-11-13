@@ -7,6 +7,7 @@ import (
 	"github.com/spf13/cobra"
 
 	"github.com/POEditor/poeditor-cli/internal/cmd/api/projects"
+	"github.com/POEditor/poeditor-cli/internal/cmd/api/pull"
 	"github.com/POEditor/poeditor-cli/internal/cmdutil"
 )
 
@@ -17,6 +18,7 @@ var Module = cmdutil.Module{
 	Commands: func(f *cmdutil.Factory) []*cobra.Command {
 		return []*cobra.Command{
 			projects.NewCmdProjects(f),
+			pull.NewCmdPull(f),
 		}
 	},
 }

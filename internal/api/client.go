@@ -112,3 +112,28 @@ func snippet(body []byte) string {
 	}
 	return s
 }
+
+// Download fetches a file the API handed out (e.g. projects/export's url).
+// Those links carry their own one-time hash, so no token is sent.
+func (c *Client) Download(ctx context.Context, fileURL string) ([]byte, error) {
+	req, err := http.NewRequestWithContext(ctx, http.MethodGet, fileURL, nil)
+	if err != nil {
+		return nil, err
+	}
+	if c.UserAgent != "" {
+		req.Header.Set("User-Agent", c.UserAgent)
+	}
+	resp, err := c.HTTP.Do(req)
+	if err != nil {
+		return nil, fmt.Errorf("cannot download the exported file: %w", err)
+	}
+	defer resp.Body.Close()
+	body, err := io.ReadAll(resp.Body)
+	if err != nil {
+		return nil, fmt.Errorf("cannot read the exported file: %w", err)
+	}
+	if resp.StatusCode != http.StatusOK {
+		return nil, fmt.Errorf("downloading the exported file failed (HTTP %d): %s", resp.StatusCode, snippet(body))
+	}
+	return body, nil
+}
