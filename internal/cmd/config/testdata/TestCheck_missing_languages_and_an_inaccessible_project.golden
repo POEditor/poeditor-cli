@@ -1,0 +1,4 @@
+FAILED  web: "Project 1001" (1001), account personal, 2 languages
+    error: file 2 (emails/{lang}.po) languages: language "fr" is not in the project (it has: de, en)
+FAILED  2002
+    error: cannot open project 2002 as client-a: API error 403: You don't have permission to access this resource

@@ -46,14 +46,14 @@ type FakeAPI struct {
 
 	t        testing.TB
 	mu       sync.Mutex
-	stubs    map[string]Stub
+	stubs    map[string]func(url.Values) Stub
 	requests []Request
 }
 
 // NewFakeAPI starts a fake API that is closed when the test ends.
 func NewFakeAPI(t testing.TB) *FakeAPI {
 	t.Helper()
-	fake := &FakeAPI{t: t, stubs: map[string]Stub{}}
+	fake := &FakeAPI{t: t, stubs: map[string]func(url.Values) Stub{}}
 	server := httptest.NewServer(http.HandlerFunc(fake.serve))
 	t.Cleanup(server.Close)
 	fake.URL = server.URL + "/v2/"
@@ -64,7 +64,16 @@ func NewFakeAPI(t testing.TB) *FakeAPI {
 func (f *FakeAPI) Stub(endpoint string, stub Stub) {
 	f.mu.Lock()
 	defer f.mu.Unlock()
-	f.stubs[endpoint] = stub
+	f.stubs[endpoint] = func(url.Values) Stub { return stub }
+}
+
+// StubFunc sets a response that depends on the request, e.g. on the project id:
+//
+//	fake.StubFunc("projects/view", func(form url.Values) testutil.Stub { ... form.Get("id") ... })
+func (f *FakeAPI) StubFunc(endpoint string, fn func(form url.Values) Stub) {
+	f.mu.Lock()
+	defer f.mu.Unlock()
+	f.stubs[endpoint] = fn
 }
 
 // Requests returns every request received so far, in order.
@@ -95,10 +104,13 @@ func (f *FakeAPI) serve(w http.ResponseWriter, r *http.Request) {
 
 	f.mu.Lock()
 	f.requests = append(f.requests, Request{Endpoint: endpoint, Form: r.PostForm})
-	stub, ok := f.stubs[endpoint]
+	stubFn, ok := f.stubs[endpoint]
 	f.mu.Unlock()
 
-	if !ok {
+	var stub Stub
+	if ok {
+		stub = stubFn(r.PostForm)
+	} else {
 		f.t.Errorf("fake API: no stub for endpoint %q", endpoint)
 		stub = Fail("404", "endpoint not stubbed in test")
 	}

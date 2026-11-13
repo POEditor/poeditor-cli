@@ -5,7 +5,10 @@
 package cmdutil
 
 import (
+	"errors"
 	"os"
+
+	"golang.org/x/term"
 
 	"github.com/POEditor/poeditor-cli/internal/accounts"
 	"github.com/POEditor/poeditor-cli/internal/api"
@@ -13,7 +16,11 @@ import (
 	"github.com/POEditor/poeditor-cli/internal/config"
 	"github.com/POEditor/poeditor-cli/internal/iostreams"
 	"github.com/POEditor/poeditor-cli/internal/keyring"
+	"github.com/POEditor/poeditor-cli/internal/prompt"
 )
+
+// ErrNotInteractive is returned by Prompt when nobody can answer questions.
+var ErrNotInteractive = errors.New("this command asks questions and needs an interactive terminal")
 
 // Factory is passed to every command constructor.
 type Factory struct {
@@ -25,21 +32,37 @@ type Factory struct {
 	BaseURL string
 	// ConfigDir overrides the config directory; "" = config.Dir().
 	ConfigDir string
+	// WorkDir is where .poeditor.yml is searched from; "" = the current directory.
+	WorkDir string
 
 	Getenv  func(string) string
 	Keyring keyring.Keyring
+	// Prompter asks questions; nil when stdin/stderr are not a terminal.
+	Prompter prompt.Prompter
 
 	cfg *config.Config
 }
 
 // New returns the factory used by the real binary.
 func New() *Factory {
-	return &Factory{
+	f := &Factory{
 		IO:      iostreams.System(os.Getenv),
 		BaseURL: os.Getenv("POEDITOR_API_URL"),
 		Getenv:  os.Getenv,
 		Keyring: keyring.System(),
 	}
+	if term.IsTerminal(int(os.Stdin.Fd())) && term.IsTerminal(int(os.Stderr.Fd())) {
+		f.Prompter = prompt.Huh{In: os.Stdin, Out: os.Stderr}
+	}
+	return f
+}
+
+// Prompt returns the prompter, or ErrNotInteractive.
+func (f *Factory) Prompt() (prompt.Prompter, error) {
+	if f.Prompter == nil {
+		return nil, ErrNotInteractive
+	}
+	return f.Prompter, nil
 }
 
 // Config loads the user config once per run.
@@ -69,6 +92,27 @@ func (f *Factory) Resolver() (*accounts.Resolver, error) {
 		return nil, err
 	}
 	return &accounts.Resolver{Config: cfg, Keyring: f.Keyring, Getenv: f.Getenv}, nil
+}
+
+// WorkingDir is the directory commands work in.
+func (f *Factory) WorkingDir() (string, error) {
+	if f.WorkDir != "" {
+		return f.WorkDir, nil
+	}
+	return os.Getwd()
+}
+
+// ResolveFor returns the account for a project of .poeditor.yml: --account
+// wins, then the project's `account:`, then the default account.
+func (f *Factory) ResolveFor(projectAccount string) (accounts.Resolved, error) {
+	r, err := f.Resolver()
+	if err != nil {
+		return accounts.Resolved{}, err
+	}
+	if f.Account != "" {
+		return r.Resolve(f.Account)
+	}
+	return r.Resolve(projectAccount)
 }
 
 // Resolve returns the account this run uses (--account, else the default).

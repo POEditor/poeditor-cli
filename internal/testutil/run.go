@@ -1,6 +1,8 @@
 package testutil
 
 import (
+	"os"
+	"path/filepath"
 	"sort"
 	"strings"
 	"sync"
@@ -32,13 +34,22 @@ type Env struct {
 	ConfigDir string
 	Vars      map[string]string // environment variables seen by the CLI
 	Stdin     string
-	TTY       bool // stdout is a terminal (default) or a pipe (false)
+	TTY       bool   // stdout is a terminal (default) or a pipe (false)
+	WorkDir   string // the "current directory" (default: a temp dir)
+	// Prompter answers prompts; nil means not interactive. Use Answer().
+	Prompter *Prompter
+}
+
+// Answer makes the run interactive, answering prompts from answers in order.
+func (e *Env) Answer(answers ...string) *Env {
+	e.Prompter = &Prompter{T: e.T, Answers: answers}
+	return e
 }
 
 // NewEnv returns an Env with no accounts, stdout a terminal.
 func NewEnv(t testing.TB, fake *FakeAPI) *Env {
 	t.Helper()
-	return &Env{T: t, Fake: fake, Keyring: &keyring.Memory{}, ConfigDir: t.TempDir(), Vars: map[string]string{}, TTY: true}
+	return &Env{T: t, Fake: fake, Keyring: &keyring.Memory{}, ConfigDir: t.TempDir(), Vars: map[string]string{}, TTY: true, WorkDir: t.TempDir()}
 }
 
 // Login sets up account name with token in the keyring, as `auth login` would.
@@ -57,6 +68,15 @@ func (e *Env) Login(name, token string) *Env {
 		e.T.Fatal(err)
 	}
 	if err := e.Keyring.Set(name, token); err != nil {
+		e.T.Fatal(err)
+	}
+	return e
+}
+
+// WriteRepoConfig writes .poeditor.yml into WorkDir.
+func (e *Env) WriteRepoConfig(content string) *Env {
+	e.T.Helper()
+	if err := os.WriteFile(filepath.Join(e.WorkDir, ".poeditor.yml"), []byte(content), 0o644); err != nil {
 		e.T.Fatal(err)
 	}
 	return e
@@ -88,8 +108,12 @@ func (e *Env) Run(args ...string) Result {
 		IO:        ios,
 		BaseURL:   baseURL,
 		ConfigDir: e.ConfigDir,
+		WorkDir:   e.WorkDir,
 		Getenv:    func(k string) string { return e.Vars[k] },
 		Keyring:   e.Keyring,
+	}
+	if e.Prompter != nil {
+		f.Prompter = e.Prompter
 	}
 
 	cmd := root.NewCmdRoot(f)

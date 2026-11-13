@@ -1,0 +1,28 @@
+# POEditor CLI: which POEditor projects this repo uses and where their files live.
+# Run "poeditor config show" to see what it maps and "poeditor config check" to
+# check it against POEditor. The API token is never stored here.
+
+projects:
+  - id: 4321
+    name: website
+    source_language: en
+    files:
+      - path: locales/{lang}.json
+        format: key_value_json
+        language_map:
+          pt-br: pt-BR
+        pull:
+          tags:
+            - web
+            - shared
+          tags_match: any
+        push:
+          tags:
+            all:
+              - web
+            new:
+              - needs-review
+            obsolete:
+              - removed
+      - path: emails/{lang}.po
+        format: po

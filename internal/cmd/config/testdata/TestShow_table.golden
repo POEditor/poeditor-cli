@@ -1,0 +1,4 @@
+PROJECT  ID    ACCOUNT             FORMAT           PATH
+web      1001  personal (default)  key_value_json   locales/{lang}.json
+web      1001  personal (default)  po               emails/{lang}.po
+2002     2002  client-a            android_strings  app/src/main/res/values-{lang}/strings.xml

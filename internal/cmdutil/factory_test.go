@@ -84,3 +84,43 @@ func TestConfig_loadedOnce(t *testing.T) {
 		t.Error("Config() should return the same instance")
 	}
 }
+
+func TestResolveFor(t *testing.T) {
+	f := factory(t, nil)
+	cfg, _ := f.Config()
+	cfg.DefaultAccount = "personal"
+	cfg.Accounts = map[string]*config.Account{"personal": {}, "client-a": {}, "client-b": {}}
+	for _, name := range []string{"personal", "client-a", "client-b"} {
+		_ = f.Keyring.Set(name, name+"-tok")
+	}
+
+	tests := []struct{ flag, project, want string }{
+		{"", "", "personal"},
+		{"", "client-a", "client-a"},
+		{"client-b", "client-a", "client-b"},
+	}
+	for _, tt := range tests {
+		f.Account = tt.flag
+		got, err := f.ResolveFor(tt.project)
+		if err != nil {
+			t.Fatal(err)
+		}
+		if got.Name != tt.want {
+			t.Errorf("--account=%q project=%q: got %q, want %q", tt.flag, tt.project, got.Name, tt.want)
+		}
+	}
+}
+
+func TestWorkingDir(t *testing.T) {
+	f := factory(t, nil)
+	f.WorkDir = "/some/repo"
+	if got, _ := f.WorkingDir(); got != "/some/repo" {
+		t.Errorf("WorkingDir = %q", got)
+	}
+}
+
+func TestPrompt_notInteractive(t *testing.T) {
+	if _, err := factory(t, nil).Prompt(); !errors.Is(err, cmdutil.ErrNotInteractive) {
+		t.Fatalf("got %v", err)
+	}
+}

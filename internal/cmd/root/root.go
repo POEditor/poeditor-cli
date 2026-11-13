@@ -7,6 +7,7 @@ import (
 	"github.com/POEditor/poeditor-cli/internal/build"
 	apicmd "github.com/POEditor/poeditor-cli/internal/cmd/api"
 	"github.com/POEditor/poeditor-cli/internal/cmd/auth"
+	configcmd "github.com/POEditor/poeditor-cli/internal/cmd/config"
 	"github.com/POEditor/poeditor-cli/internal/cmdutil"
 )
 
@@ -16,6 +17,7 @@ var topLevel = apicmd.Module
 // modules are attached as `poeditor <module.Name> <command>`.
 var modules = []cmdutil.Module{
 	auth.Module,
+	configcmd.Module,
 }
 
 // NewCmdRoot returns the root command with every module attached.

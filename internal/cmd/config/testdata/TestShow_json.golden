@@ -1,0 +1,42 @@
+{
+  "file": "<repo>/.poeditor.yml",
+  "projects": [
+    {
+      "id": 1001,
+      "name": "web",
+      "source_language": "en",
+      "files": [
+        {
+          "path": "locales/{lang}.json",
+          "format": "key_value_json"
+        },
+        {
+          "path": "emails/{lang}.po",
+          "format": "po",
+          "languages": [
+            "en",
+            "fr"
+          ]
+        }
+      ]
+    },
+    {
+      "id": 2002,
+      "account": "client-a",
+      "source_language": "en",
+      "files": [
+        {
+          "path": "app/src/main/res/values-{lang}/strings.xml",
+          "format": "android_strings",
+          "language_map": {
+            "pt-br": "pt-rBR"
+          },
+          "pull": {
+            "fallback_language": "en"
+          }
+        }
+      ]
+    }
+  ],
+  "issues": []
+}
