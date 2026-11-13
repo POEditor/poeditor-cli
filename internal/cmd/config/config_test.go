@@ -17,7 +17,7 @@ func TestMain(m *testing.M) { testutil.Main(m) }
 const twoProjects = `
 projects:
   - id: 1001
-    name: web
+    alias: web
     source_language: en
     files:
       - {path: "locales/{lang}.json", format: key_value_json}
@@ -241,7 +241,8 @@ projects:
 		if res.Err != nil {
 			t.Fatal(res.Err)
 		}
-		if !strings.HasPrefix(res.Stdout, "{\n  \"ok\": true,") || !strings.Contains(res.Stdout, "\"account\": \"client-a\"") {
+		if !strings.HasPrefix(res.Stdout, "{\n  \"ok\": true,") || !strings.Contains(res.Stdout, "\"account\": \"client-a\"") ||
+			!strings.Contains(res.Stdout, "\"project\": {\n        \"id\": 1001,\n        \"alias\": \"web\",\n        \"name\": \"Project 1001\"\n      }") {
 			t.Errorf("stdout = %s", res.Stdout)
 		}
 	})

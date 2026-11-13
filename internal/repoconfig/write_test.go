@@ -13,7 +13,7 @@ import (
 
 func TestCreate(t *testing.T) {
 	path := filepath.Join(t.TempDir(), repoconfig.FileName)
-	cfg := repoconfig.New(path, []repoconfig.Project{{ID: 1, Name: "web", SourceLanguage: "en",
+	cfg := repoconfig.New(path, []repoconfig.Project{{ID: 1, Alias: "web", SourceLanguage: "en",
 		Files: []repoconfig.File{{Path: "l/{lang}.json", Format: "key_value_json"}}}})
 
 	if err := cfg.Create(); err != nil {
@@ -23,7 +23,7 @@ func TestCreate(t *testing.T) {
 	want := repoconfig.Header + `
 projects:
   - id: 1
-    name: web
+    alias: web
     source_language: en
     files:
       - path: l/{lang}.json
@@ -42,7 +42,7 @@ const handWritten = `# our team's config
 projects:
   # the website
   - id: 1
-    name: web
+    alias: web
     source_language: en
     files: [{path: "a/{lang}.json", format: json}]  # inline on purpose
 `

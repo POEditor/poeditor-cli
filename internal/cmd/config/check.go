@@ -58,9 +58,9 @@ Exits with an error if anything is wrong, so it can run in CI.`,
 					if repoconfig.HasErrors(p.Issues) {
 						status = "FAILED"
 					}
-					line := fmt.Sprintf("%s  %s", status, p.Label)
-					if p.Name != "" {
-						line += fmt.Sprintf(": %q (%d), account %s, %d languages", p.Name, p.ID, p.Account, len(p.Languages))
+					line := fmt.Sprintf("%s  %s", status, p.label)
+					if p.Project.Name != "" {
+						line += fmt.Sprintf(": %q (%d), account %s, %d languages", p.Project.Name, p.Project.ID, p.Account, len(p.Languages))
 					}
 					fmt.Fprintln(f.IO.Out, line)
 					for _, issue := range p.Issues {
@@ -96,16 +96,24 @@ func (r checkReport) allIssues() []repoconfig.Issue {
 }
 
 type projectReport struct {
-	Label     string             `json:"project"`
-	ID        int                `json:"id"`
+	Project   projectRef         `json:"project"`
 	Account   string             `json:"account"`
-	Name      string             `json:"name"`      // the project's name in POEditor
 	Languages []string           `json:"languages"` // the project's language codes
 	Issues    []repoconfig.Issue `json:"issues"`
+
+	label string
+}
+
+// projectRef is how JSON output names a project: its id, the alias from
+// .poeditor.yml (if any) and, when the command fetched it, its POEditor name.
+type projectRef struct {
+	ID    int    `json:"id"`
+	Alias string `json:"alias,omitempty"`
+	Name  string `json:"name,omitempty"`
 }
 
 func checkProject(cmd *cobra.Command, f *cmdutil.Factory, p repoconfig.Project) projectReport {
-	rep := projectReport{Label: p.Label(), ID: p.ID, Languages: []string{}, Issues: []repoconfig.Issue{}}
+	rep := projectReport{Project: projectRef{ID: p.ID, Alias: p.Alias}, Languages: []string{}, Issues: []repoconfig.Issue{}, label: p.Label()}
 	fail := func(sev repoconfig.Severity, msg string) {
 		rep.Issues = append(rep.Issues, repoconfig.Issue{Severity: sev, Where: "project " + p.Label(), Message: msg})
 	}
@@ -131,7 +139,7 @@ func checkProject(cmd *cobra.Command, f *cmdutil.Factory, p repoconfig.Project) 
 		fail(repoconfig.Error, fmt.Sprintf("cannot open project %d as %s: %v", p.ID, rep.Account, err))
 		return rep
 	}
-	rep.Name = view.Project.Name
+	rep.Project.Name = view.Project.Name
 
 	var langs struct {
 		Languages []struct {

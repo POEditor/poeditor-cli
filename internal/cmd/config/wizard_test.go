@@ -84,7 +84,7 @@ func TestInit_fullWalkthrough(t *testing.T) {
 	touch(t, env.WorkDir, "locales/en.json", "locales/fr.json", "locales/pt-BR.json")
 	env.Answer(
 		"Website (4321)",      // project
-		testutil.Default,      // name: "website"
+		testutil.Default,      // alias: "website"
 		testutil.Default,      // source language: en (the project's reference language)
 		"locales/{lang}.json", // file found in the repo
 		testutil.Default,      // format: guessed key_value_json
@@ -163,7 +163,7 @@ func TestInit_nameValidation(t *testing.T) {
 	if !reflect.DeepEqual(env.Prompter.Rejected, want) {
 		t.Errorf("rejected = %v, want %v", env.Prompter.Rejected, want)
 	}
-	if body := readRepoConfig(t, env); !strings.Contains(body, "name: mobile") || strings.Contains(body, "account:") {
+	if body := readRepoConfig(t, env); !strings.Contains(body, "alias: mobile") || strings.Contains(body, "account:") {
 		t.Errorf("config:\n%s", body)
 	}
 }
@@ -215,7 +215,7 @@ func TestInit_refusals(t *testing.T) {
 
 func TestAdd_project(t *testing.T) {
 	env := testutil.NewEnv(t, fakeWizardAPI(t, personal)).Login("personal", "p-tok")
-	env.WriteRepoConfig("# keep me\nprojects:\n  - {id: 4321, name: website, source_language: en, files: [{path: \"l/{lang}.json\", format: json}]}\n")
+	env.WriteRepoConfig("# keep me\nprojects:\n  - {id: 4321, alias: website, source_language: en, files: [{path: \"l/{lang}.json\", format: json}]}\n")
 	// no translation files in the directory: the wizard goes straight to typing a path
 	env.Answer("Another project", "Mobile app", testutil.Default, testutil.Default,
 		"l/{lang}.json", "mobile/{lang}.json", testutil.Default, "", "", "n", "n")
@@ -243,8 +243,8 @@ func TestAdd_project(t *testing.T) {
 func TestAdd_fileToExistingProject(t *testing.T) {
 	env := testutil.NewEnv(t, fakeWizardAPI(t, personal)).Login("personal", "p-tok")
 	env.WriteRepoConfig(`projects:
-  - {id: 4321, name: website, source_language: en, files: [{path: "l/{lang}.json", format: json}]}
-  - {id: 7717, name: mobile, source_language: en, files: [{path: "m/{lang}.json", format: json}]}
+  - {id: 4321, alias: website, source_language: en, files: [{path: "l/{lang}.json", format: json}]}
+  - {id: 7717, alias: mobile, source_language: en, files: [{path: "m/{lang}.json", format: json}]}
 `)
 	touch(t, env.WorkDir, "android/values-de/strings.xml", "android/values-en/strings.xml")
 	env.Answer("A file to an existing project", "mobile", "android/values-{lang}/strings.xml", testutil.Default, "", "", "n")

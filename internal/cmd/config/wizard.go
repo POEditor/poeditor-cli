@@ -175,8 +175,8 @@ func slug(name string) string {
 
 var allDigitsRe = regexp.MustCompile(`^[0-9]+$`)
 
-func (w *wizard) askName(projectName string, taken map[string]bool) (string, error) {
-	return w.ask.Input("Short name for --project (empty for none)", slug(projectName), func(s string) error {
+func (w *wizard) askAlias(projectName string, taken map[string]bool) (string, error) {
+	return w.ask.Input("Alias to use with --project (empty for none)", slug(projectName), func(s string) error {
 		switch {
 		case s == "":
 			return nil
@@ -354,12 +354,12 @@ func (w *wizard) askTags(title string) ([]string, error) {
 
 // askProject runs the steps for one new project.
 func (w *wizard) askProject(existing *repoconfig.Config) (repoconfig.Project, error) {
-	excludeIDs, takenNames, takenPaths := map[int]bool{}, map[string]bool{}, map[string]bool{}
+	excludeIDs, takenAliases, takenPaths := map[int]bool{}, map[string]bool{}, map[string]bool{}
 	if existing != nil {
 		for _, p := range existing.Projects {
 			excludeIDs[p.ID] = true
-			if p.Name != "" {
-				takenNames[p.Name] = true
+			if p.Alias != "" {
+				takenAliases[p.Alias] = true
 			}
 			for _, f := range p.Files {
 				takenPaths[f.Path] = true
@@ -382,7 +382,7 @@ func (w *wizard) askProject(existing *repoconfig.Config) (repoconfig.Project, er
 		return repoconfig.Project{}, err
 	}
 
-	name, err := w.askName(remote.Name, takenNames)
+	alias, err := w.askAlias(remote.Name, takenAliases)
 	if err != nil {
 		return repoconfig.Project{}, err
 	}
@@ -391,7 +391,7 @@ func (w *wizard) askProject(existing *repoconfig.Config) (repoconfig.Project, er
 		return repoconfig.Project{}, err
 	}
 
-	project := repoconfig.Project{ID: remote.ID, Name: name, Account: account.write, SourceLanguage: source}
+	project := repoconfig.Project{ID: remote.ID, Alias: alias, Account: account.write, SourceLanguage: source}
 	for {
 		file, err := w.askFile(codes, takenPaths)
 		if err != nil {

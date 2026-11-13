@@ -41,7 +41,7 @@ func TestLoad_full(t *testing.T) {
 	path := write(t, t.TempDir(), `
 projects:
   - id: 12345
-    name: web
+    alias: web
     account: client-a
     source_language: en
     files:
@@ -119,13 +119,13 @@ projects:
 `, nil},
 		{"missing id, files", `
 projects:
-  - name: web
+  - alias: web
 ` + ok, []string{"error: project web: `id` is required", "error: project web: no files"}},
-		{"numeric name and duplicate name", `
+		{"numeric alias and duplicate alias", `
 projects:
-  - {id: 1, name: "123", source_language: en, files: [{path: "a/{lang}.json", format: json}]}
-  - {id: 2, name: "123", source_language: en, files: [{path: "b/{lang}.json", format: json}]}
-`, []string{"must not be all digits", "must not be all digits", "duplicate project name"}},
+  - {id: 1, alias: "123", source_language: en, files: [{path: "a/{lang}.json", format: json}]}
+  - {id: 2, alias: "123", source_language: en, files: [{path: "b/{lang}.json", format: json}]}
+`, []string{"`alias` must not be all digits", "`alias` must not be all digits", "duplicate project alias"}},
 		{"bad account name", `
 projects:
   - {id: 1, account: "Client A", source_language: en, files: [{path: "a/{lang}.json", format: json}]}
@@ -241,7 +241,7 @@ func TestHasErrors(t *testing.T) {
 func TestSelect(t *testing.T) {
 	cfg, err := repoconfig.Load(write(t, t.TempDir(), `
 projects:
-  - {id: 1, name: web, files: []}
+  - {id: 1, alias: web, files: []}
   - {id: 2, files: []}
 `))
 	if err != nil {

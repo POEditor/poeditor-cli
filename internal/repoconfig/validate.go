@@ -47,25 +47,25 @@ func (c *Config) Validate() []Issue {
 		return v.issues
 	}
 
-	names := map[string]bool{}
+	aliases := map[string]bool{}
 	seenPaths := map[string]string{}
 	for pi, p := range c.Projects {
 		where := fmt.Sprintf("project %d", pi+1)
-		if p.Name != "" {
-			where = fmt.Sprintf("project %s", p.Name)
+		if p.Alias != "" {
+			where = fmt.Sprintf("project %s", p.Alias)
 		}
 
 		if p.ID <= 0 {
 			v.add(Error, where, "`id` is required: the project ID shown in POEditor")
 		}
-		if p.Name != "" {
-			if allDigits.MatchString(p.Name) {
-				v.add(Error, where, "`name` must not be all digits (it would be mistaken for a project id)")
+		if p.Alias != "" {
+			if allDigits.MatchString(p.Alias) {
+				v.add(Error, where, "`alias` must not be all digits (it would be mistaken for a project id)")
 			}
-			if names[p.Name] {
-				v.add(Error, where, "duplicate project name")
+			if aliases[p.Alias] {
+				v.add(Error, where, "duplicate project alias")
 			}
-			names[p.Name] = true
+			aliases[p.Alias] = true
 		}
 		if p.Account != "" {
 			if err := accounts.ValidateName(p.Account); err != nil {

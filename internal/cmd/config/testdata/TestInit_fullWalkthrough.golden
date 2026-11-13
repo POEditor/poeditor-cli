@@ -4,7 +4,7 @@
 
 projects:
   - id: 4321
-    name: website
+    alias: website
     source_language: en
     files:
       - path: locales/{lang}.json

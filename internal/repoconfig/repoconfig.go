@@ -32,7 +32,7 @@ type Config struct {
 // Project is one POEditor project used by the repo.
 type Project struct {
 	ID             int    `yaml:"id" json:"id"`
-	Name           string `yaml:"name,omitempty" json:"name,omitempty"`
+	Alias          string `yaml:"alias,omitempty" json:"alias,omitempty"` // local nickname for --project
 	Account        string `yaml:"account,omitempty" json:"account,omitempty"`
 	SourceLanguage string `yaml:"source_language,omitempty" json:"source_language,omitempty"`
 	Files          []File `yaml:"files" json:"files"`
@@ -119,22 +119,22 @@ func (c *Config) Path() string { return c.path }
 // Dir is the directory file paths are relative to.
 func (c *Config) Dir() string { return filepath.Dir(c.path) }
 
-// Label is how a project is named in messages: its name, else its id.
+// Label is how a project is named in messages: its alias, else its id.
 func (p Project) Label() string {
-	if p.Name != "" {
-		return p.Name
+	if p.Alias != "" {
+		return p.Alias
 	}
 	return strconv.Itoa(p.ID)
 }
 
-// Select returns the projects matching --project (a name or an id), or all
+// Select returns the projects matching --project (an alias or an id), or all
 // of them when selector is empty.
 func (c *Config) Select(selector string) ([]Project, error) {
 	if selector == "" {
 		return c.Projects, nil
 	}
 	for _, p := range c.Projects {
-		if p.Name == selector || strconv.Itoa(p.ID) == selector {
+		if p.Alias == selector || strconv.Itoa(p.ID) == selector {
 			return []Project{p}, nil
 		}
 	}
