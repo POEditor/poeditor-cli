@@ -1,0 +1,3 @@
+# LF everywhere, so golden files and gofmt agree on Windows checkouts too
+* text=auto eol=lf
+*.golden text eol=lf
