@@ -55,6 +55,21 @@ func TestUnknownCommand(t *testing.T) {
 	}
 }
 
+// The api module sits at the top level and has no `poeditor api …` spelling
+// (that name stays free for a raw API request command, like `gh api`).
+func TestAPIModuleIsTopLevel(t *testing.T) {
+	for _, cmd := range testutil.Leaves() {
+		if cmd.CommandPath() == "poeditor projects list" {
+			res := testutil.Run(t, nil, "api", "projects", "list")
+			if res.Err == nil || !strings.Contains(res.Err.Error(), `unknown command "api"`) {
+				t.Fatalf("`poeditor api …` should not exist, got %v", res.Err)
+			}
+			return
+		}
+	}
+	t.Fatal(`"poeditor projects list" not found at the top level`)
+}
+
 func dirHasTestMain(t *testing.T, dir string) bool {
 	t.Helper()
 	files, err := filepath.Glob(filepath.Join(dir, "*_test.go"))
