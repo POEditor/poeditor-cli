@@ -1,6 +1,8 @@
-// Package raw is `poeditor api <group> <action>`: send any API v2 request with the
-// account's token and print the response, like `gh api`. It is the escape
-// hatch for endpoints that have no command yet.
+// Package raw gives every API v2 endpoint that has no dedicated command yet
+// a command of its own under `poeditor api` (`poeditor api languages list
+// --id 7717`): it sends the request with the account's token and prints the
+// response. When an endpoint gets its dedicated command, that command takes
+// its place, so each endpoint is always exactly one command.
 package raw
 
 import (
@@ -12,7 +14,6 @@ import (
 	"net/url"
 	"os"
 	"path/filepath"
-	"regexp"
 	"strings"
 
 	"github.com/spf13/cobra"
@@ -21,42 +22,103 @@ import (
 	"github.com/POEditor/poeditor-cli/internal/cmdutil"
 )
 
-// endpointPattern is <group>/<action>, as the API v2 docs write endpoints.
-var endpointPattern = regexp.MustCompile(`^[a-z]+/[a-z_]+$`)
+// Endpoints is every public API v2 endpoint, <group>/<action> (server:
+// application/modules/v2/controllers; listAll is list, addComment is
+// add_comment). translations/propose has a model but no controller action,
+// so it is not public.
+var Endpoints = []string{
+	"projects/list", "projects/add", "projects/view", "projects/update", "projects/delete",
+	"projects/upload", "projects/sync", "projects/export",
+	"languages/available", "languages/list", "languages/add", "languages/update", "languages/delete",
+	"terms/list", "terms/add", "terms/update", "terms/delete", "terms/add_comment",
+	"translations/add", "translations/update", "translations/delete", "translations/automatic",
+	"contributors/list", "contributors/add", "contributors/remove",
+}
 
-// request is everything `poeditor api` sends, checked before any API call.
+// destructive endpoints delete data: their raw commands send nothing
+// without --yes, like every deleting command. projects/sync deletes every
+// term missing from the uploaded list.
+var destructive = map[string]bool{
+	"projects/delete": true, "projects/sync": true, "languages/delete": true,
+	"terms/delete": true, "translations/delete": true, "contributors/remove": true,
+}
+
+// groupShort describes the groups that may exist only through raw commands.
+var groupShort = map[string]string{
+	"projects":     "Work with POEditor projects",
+	"languages":    "Work with a project's languages",
+	"terms":        "Work with a project's terms",
+	"translations": "Work with a project's translations",
+	"contributors": "Work with a project's contributors",
+}
+
+// AddEndpoints gives every endpoint without a command under apiCmd a raw
+// one: `<group> <action>` (dashes for the API's underscores), creating the
+// group when it has no dedicated commands yet.
+func AddEndpoints(f *cmdutil.Factory, apiCmd *cobra.Command) error {
+	for _, endpoint := range Endpoints {
+		groupName, action, _ := strings.Cut(endpoint, "/")
+		group := child(apiCmd, groupName)
+		if group == nil {
+			group = cmdutil.NewGroup(groupName+" <command>", groupShort[groupName])
+			if err := cmdutil.AddUnique(apiCmd, group); err != nil {
+				return err
+			}
+		}
+		if child(group, CommandName(action)) != nil {
+			continue // it has a dedicated command
+		}
+		if err := cmdutil.AddUnique(group, NewCmdEndpoint(f, endpoint)); err != nil {
+			return err
+		}
+	}
+	return nil
+}
+
+// CommandName is an API action as a command name: add_comment → add-comment.
+func CommandName(action string) string { return strings.ReplaceAll(action, "_", "-") }
+
+func child(parent *cobra.Command, name string) *cobra.Command {
+	for _, c := range parent.Commands() {
+		if c.Name() == name {
+			return c
+		}
+	}
+	return nil
+}
+
+// request is everything a raw command sends, checked before any API call.
 type request struct {
 	endpoint string
 	params   url.Values
 	file     *api.File
 }
 
-// NewCmdAPI returns `poeditor api`.
-func NewCmdAPI(f *cmdutil.Factory) *cobra.Command {
+// NewCmdEndpoint returns the raw command for one endpoint.
+func NewCmdEndpoint(f *cmdutil.Factory, endpoint string) *cobra.Command {
 	var (
 		fields     []string
 		fileFields []string
 		upload     string
 		envelope   bool
 		asJSON     bool
+		yes        bool
 	)
+	_, action, _ := strings.Cut(endpoint, "/")
 
 	cmd := &cobra.Command{
-		Use:   "api <group> <action> [--<parameter> <value>]...",
-		Short: "Send a request to any POEditor API v2 endpoint",
-		Long: `Send a request to any POEditor API v2 endpoint and print the response.
-
-The endpoint is given as two words, <group> <action> (projects view, terms
-add-comment), or in the API documentation's spelling, projects/view or
-terms/add_comment. The token of the account (--account, else the default
-account) is added for you.
+		Use:   CommandName(action) + " [--<parameter> <value>]...",
+		Short: "Send a " + endpoint + " request (no dedicated command yet)",
+		Long: `Send a ` + endpoint + ` request to POEditor API v2 and print the response. The
+token of the account (--account, else the default account) is added for you.
+See the API documentation for the endpoint's parameters.
 
 API parameters are flags named after them: --id 7717, --id=7717, and
 --reference-language en for reference_language. A parameter flag given alone
 (--overwrite) sends 1; a value starting with "-" needs the = form (--x=-1).
-Put parameters after the endpoint. The command's own flags below keep their
-meaning; for a parameter that has the same name as one of them, or whose value
-should come from a file, use --field or --field-file.
+The command's own flags below keep their meaning; for a parameter that has the
+same name as one of them, or whose value should come from a file, use --field
+or --field-file.
 
 The "result" of the response is printed like every other command's data: a
 table on a terminal (a list becomes rows, an object a single row, nested
@@ -64,17 +126,7 @@ values compact JSON), tab-separated without a header when piped, and JSON with
 --json, keys in the order the API sent them. --envelope prints the whole
 response as JSON, including the "response" status block. When the API refuses
 the request, the command exits 1 with the API's error (and with --envelope, the
-response is printed first).
-
-This is the escape hatch for anything that has no command yet; prefer the
-dedicated commands (poeditor projects list…) when they exist.`,
-		Example: `  poeditor api projects list
-  poeditor api projects view --id 7717
-  poeditor api projects update --id 7717 --reference-language en
-  poeditor api terms add --id 7717 -F data=terms.json
-  poeditor api projects upload --id 7717 --updating terms --overwrite --upload en.json
-  poeditor api languages list --id=7717 --json
-  poeditor api terms/add_comment --id 7717 -F data=comments.json`,
+response is printed first).`,
 		// the endpoint's parameters can't be declared as flags: splitArgs
 		// separates them from ours, then we parse ours
 		DisableFlagParsing: true,
@@ -94,13 +146,17 @@ dedicated commands (poeditor projects list…) when they exist.`,
 			if help, _ := cmd.Flags().GetBool("help"); help {
 				return cmd.Help()
 			}
-			if n := len(parsed.positional); n < 1 || n > 2 {
-				return fmt.Errorf("expected <group> <action> (e.g. `poeditor api projects list`), got %d argument(s)", n)
+			if len(parsed.positional) > 0 {
+				return fmt.Errorf("unexpected argument %q: API parameters are given as --name value", parsed.positional[0])
 			}
 
-			req, err := buildRequest(f, endpoint(parsed.positional), parsed.params, fields, fileFields, upload)
+			req, err := buildRequest(f, endpoint, parsed.params, fields, fileFields, upload)
 			if err != nil {
 				return err
+			}
+			if destructive[endpoint] && !yes {
+				return fmt.Errorf("%s deletes data and cannot be undone; nothing was sent. To send it, run:\n  %s %s --yes",
+					endpoint, cmd.CommandPath(), shellJoin(args))
 			}
 			client, err := f.APIClient()
 			if err != nil {
@@ -132,28 +188,33 @@ dedicated commands (poeditor projects list…) when they exist.`,
 
 	cmd.Flags().StringArrayVarP(&fields, "field", "f", nil, "Add a parameter `key=value` (repeatable; repeat a key to send it several times)")
 	cmd.Flags().StringArrayVarP(&fileFields, "field-file", "F", nil, "Add a parameter `key=path` whose value is the file's content (\"-\" = stdin), e.g. -F data=terms.json")
-	cmd.Flags().StringVar(&upload, "upload", "", "Attach a file as the multipart field \"file\" (projects/upload)")
+	cmd.Flags().StringVar(&upload, "upload", "", "Attach a file as the multipart field \"file\" (projects upload)")
 	cmd.Flags().BoolVar(&envelope, "envelope", false, "Print the whole response as JSON, not only its result")
 	cmdutil.AddJSONFlag(cmd, &asJSON)
+	if destructive[endpoint] {
+		cmd.Long += "\n\n" + endpoint + " deletes data: without --yes nothing is sent."
+		cmd.Flags().BoolVar(&yes, "yes", false, "Send the request: it deletes data and cannot be undone")
+	}
 	return cmd
 }
 
-// endpoint joins `<group> <action>` into the API's <group>/<action>, with
-// dashes as the API's underscores (add-comment → add_comment).
-func endpoint(args []string) string {
-	if len(args) == 1 {
-		return args[0]
+// shellJoin writes args back as a command line to copy, quoting what the
+// shell would split or expand.
+func shellJoin(args []string) string {
+	quoted := make([]string, len(args))
+	for i, arg := range args {
+		if arg == "" || strings.ContainsAny(arg, " \t\n'\"\\$`|&;<>()*?[]{}~#!") {
+			arg = "'" + strings.ReplaceAll(arg, "'", `'\''`) + "'"
+		}
+		quoted[i] = arg
 	}
-	return args[0] + "/" + strings.ReplaceAll(args[1], "-", "_")
+	return strings.Join(quoted, " ")
 }
 
 // buildRequest checks the arguments and reads the files; it makes no API call.
 // params are the --name value parameters; --field and --field-file add to them.
 func buildRequest(f *cmdutil.Factory, endpoint string, params url.Values, fields, fileFields []string, upload string) (request, error) {
-	req := request{endpoint: strings.Trim(endpoint, "/"), params: params}
-	if !endpointPattern.MatchString(req.endpoint) {
-		return req, fmt.Errorf("invalid endpoint %q: use <group> <action>, e.g. `poeditor api projects list`", endpoint)
-	}
+	req := request{endpoint: endpoint, params: params}
 
 	for _, field := range fields {
 		key, value, err := splitField("--field", field)

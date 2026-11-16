@@ -40,7 +40,7 @@ func NewCmdRoot(f *cmdutil.Factory) *cobra.Command {
 
 	must(cmdutil.AddUnique(cmd, topLevel.Commands(f)...))
 	for _, m := range modules {
-		group := &cobra.Command{Use: m.Name + " <command>", Short: m.Short}
+		group := cmdutil.NewGroup(m.Name+" <command>", m.Short)
 		must(cmdutil.AddUnique(group, m.Commands(f)...))
 		must(cmdutil.AddUnique(cmd, group))
 	}

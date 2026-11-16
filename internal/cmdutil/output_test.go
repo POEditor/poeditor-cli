@@ -59,6 +59,18 @@ func TestPrintJSON(t *testing.T) {
 	}
 }
 
+// Translations often hold HTML; --json shows it as written.
+func TestPrintJSON_keepsHTML(t *testing.T) {
+	ios, _, out, _ := iostreams.Test()
+
+	if err := cmdutil.PrintJSON(ios, map[string]string{"text": "<b>Save</b> & close"}); err != nil {
+		t.Fatal(err)
+	}
+	if want := "{\n  \"text\": \"<b>Save</b> & close\"\n}\n"; out.String() != want {
+		t.Errorf("got %q, want %q", out.String(), want)
+	}
+}
+
 func TestOutputAnnotations(t *testing.T) {
 	var asJSON bool
 	data := &cobra.Command{Use: "list"}
@@ -178,6 +190,51 @@ func TestTable_fitsTheTerminal(t *testing.T) {
 			for _, row := range tt.rows {
 				table.AddRow(row...)
 			}
+
+			if err := table.Render(); err != nil {
+				t.Fatal(err)
+			}
+			if out.String() != tt.want {
+				t.Errorf("got\n%s\nwant\n%s", out.String(), tt.want)
+			}
+		})
+	}
+}
+
+func TestTable_minWidth(t *testing.T) {
+	status := "FUZZY: 0  UPDATED: 2026-03-01" // 29 columns, must stay on one line
+	tests := []struct {
+		name  string
+		width int
+		want  string
+	}{
+		{
+			name:  "the column keeps its minimum, the others wrap",
+			width: 42, // 4 for gaps, 29 reserved, 9 left for TERM and NOTE
+			want: "TERM   TRANSLATION                    NOTE\n" +
+				"a      FUZZY: 0  UPDATED: 2026-03-01  a\n" +
+				"long   Salvează                       long\n" +
+				"term                                  note\n",
+		},
+		{
+			name:  "too narrow for the minimum: shared as usual",
+			width: 30,
+			want: "TERM       TRANSLAT…  NOTE\n" +
+				"a long     FUZZY: 0   a long\n" +
+				"term       UPDATED:   note\n" +
+				"           2026-03-0\n" +
+				"           1\n" +
+				"           Salvează\n",
+		},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			ios, _, out, _ := iostreams.Test()
+			ios.SetStdoutTTY(true)
+			ios.SetTerminalWidth(tt.width)
+			table := cmdutil.NewTable(ios, "TERM", "TRANSLATION", "NOTE")
+			table.SetMinWidth(1, len(status))
+			table.AddRow("a long term", status+"\nSalvează", "a long note")
 
 			if err := table.Render(); err != nil {
 				t.Fatal(err)

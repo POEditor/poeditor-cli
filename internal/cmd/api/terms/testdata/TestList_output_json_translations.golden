@@ -1,0 +1,72 @@
+[
+  {
+    "term": "save",
+    "context": "button",
+    "plural": "",
+    "reference": "",
+    "comment": "",
+    "tags": [
+      "web"
+    ],
+    "created": "2026-01-14T09:12:44+0000",
+    "updated": "",
+    "translation": {
+      "content": "Salvează",
+      "fuzzy": 1,
+      "proofread": 0,
+      "updated": "2026-03-01T08:00:00+0000"
+    }
+  },
+  {
+    "term": "files",
+    "context": "",
+    "plural": "files_plural",
+    "reference": "",
+    "comment": "",
+    "tags": [],
+    "created": "2025-06-02T17:03:10+0000",
+    "updated": "",
+    "translation": {
+      "content": {
+        "one": "1 fișier",
+        "few": "%d fișiere",
+        "other": "%d de fișiere"
+      },
+      "fuzzy": 0,
+      "proofread": 1,
+      "updated": "2026-03-02T09:30:00+0000"
+    }
+  },
+  {
+    "term": "terms_of_use",
+    "context": "",
+    "plural": "",
+    "reference": "",
+    "comment": "",
+    "tags": [],
+    "created": "2025-06-02T17:03:10+0000",
+    "updated": "",
+    "translation": {
+      "content": "",
+      "fuzzy": 0,
+      "proofread": 0,
+      "updated": ""
+    }
+  },
+  {
+    "term": "intro",
+    "context": "",
+    "plural": "",
+    "reference": "",
+    "comment": "",
+    "tags": [],
+    "created": "2025-06-02T17:03:10+0000",
+    "updated": "",
+    "translation": {
+      "content": "<b>Bine ați venit!</b>\nApăsați Start.",
+      "fuzzy": 0,
+      "proofread": 1,
+      "updated": "2026-03-03T11:00:00+0000"
+    }
+  }
+]

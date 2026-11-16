@@ -27,10 +27,10 @@ func TestList_output(t *testing.T) {
 		args   []string
 		result any
 	}{
-		{"table", []string{"projects", "list"}, twoProjects},
-		{"table_empty", []string{"projects", "list"}, noProjects},
-		{"json", []string{"projects", "list", "--json"}, twoProjects},
-		{"json_empty", []string{"projects", "list", "--json"}, noProjects},
+		{"table", []string{"api", "projects", "list"}, twoProjects},
+		{"table_empty", []string{"api", "projects", "list"}, noProjects},
+		{"json", []string{"api", "projects", "list", "--json"}, twoProjects},
+		{"json_empty", []string{"api", "projects", "list", "--json"}, noProjects},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
@@ -61,7 +61,7 @@ func TestList_apiError(t *testing.T) {
 	fake := testutil.NewFakeAPI(t)
 	fake.Stub("projects/list", testutil.Fail("4011", "Invalid API Token"))
 
-	res := testutil.Run(t, fake, "projects", "list")
+	res := testutil.Run(t, fake, "api", "projects", "list")
 
 	var apiErr *api.Error
 	if !errors.As(res.Err, &apiErr) || apiErr.Code != "4011" {
@@ -76,7 +76,7 @@ func TestList_apiError(t *testing.T) {
 }
 
 func TestList_noToken(t *testing.T) {
-	res := testutil.Run(t, nil, "projects", "list")
+	res := testutil.Run(t, nil, "api", "projects", "list")
 
 	if !errors.Is(res.Err, accounts.ErrNotLoggedIn) {
 		t.Fatalf("want ErrNotLoggedIn, got %v", res.Err)
@@ -86,7 +86,7 @@ func TestList_noToken(t *testing.T) {
 func TestList_rejectsArguments(t *testing.T) {
 	fake := testutil.NewFakeAPI(t)
 
-	res := testutil.Run(t, fake, "projects", "list", "extra")
+	res := testutil.Run(t, fake, "api", "projects", "list", "extra")
 
 	if res.Err == nil || !strings.Contains(res.Err.Error(), "unknown command") {
 		t.Fatalf("want an argument error, got %v", res.Err)
@@ -104,14 +104,14 @@ func TestList_accountHint(t *testing.T) {
 		wantToken  string
 		wantStderr string
 	}{
-		{"one account: no hint", []string{"default"}, []string{"projects", "list"}, "default-tok", ""},
-		{"two accounts", []string{"default", "client-a"}, []string{"projects", "list"}, "default-tok",
+		{"one account: no hint", []string{"default"}, []string{"api", "projects", "list"}, "default-tok", ""},
+		{"two accounts", []string{"default", "client-a"}, []string{"api", "projects", "list"}, "default-tok",
 			"\nAccount: default (also logged in: client-a — use --account client-a)\n"},
-		{"--account picks the other", []string{"default", "client-a"}, []string{"projects", "list", "--account", "client-a"}, "client-a-tok",
+		{"--account picks the other", []string{"default", "client-a"}, []string{"api", "projects", "list", "--account", "client-a"}, "client-a-tok",
 			"\nAccount: client-a (also logged in: default — use --account default)\n"},
-		{"three accounts", []string{"default", "b", "c"}, []string{"projects", "list"}, "default-tok",
+		{"three accounts", []string{"default", "b", "c"}, []string{"api", "projects", "list"}, "default-tok",
 			"\nAccount: default (also logged in: b, c — use --account <name>)\n"},
-		{"json keeps stdout clean", []string{"default", "client-a"}, []string{"projects", "list", "--json"}, "default-tok",
+		{"json keeps stdout clean", []string{"default", "client-a"}, []string{"api", "projects", "list", "--json"}, "default-tok",
 			"\nAccount: default (also logged in: client-a — use --account client-a)\n"},
 	}
 	for _, tt := range tests {
@@ -158,7 +158,7 @@ func TestList_piped(t *testing.T) {
 			env := testutil.NewEnv(t, fake).Login("default", testutil.TestToken)
 			env.TTY = false
 
-			res := env.Run("projects", "list")
+			res := env.Run("api", "projects", "list")
 
 			if res.Err != nil || res.Stdout != tt.want {
 				t.Fatalf("got %q, %v; want %q", res.Stdout, res.Err, tt.want)

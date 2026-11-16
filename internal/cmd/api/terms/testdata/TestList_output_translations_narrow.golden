@@ -1,0 +1,24 @@
+TERM  CON…  TRANSLATION                                           PLU…  REF…  TAGS  COM…  CRE…  UPD…
+save  butt  FUZZY: 1  PROOFREAD: 0  UPDATED: 2026-03-01 08:00:00              web         2026
+      on    Salvează                                                                      -01-
+                                                                                          14
+                                                                                          09:1
+                                                                                          2:44
+
+file        FUZZY: 0  PROOFREAD: 1  UPDATED: 2026-03-02 09:30:00  file                    2025
+s           one: 1 fișier                                         s_pl                    -06-
+            few: %d fișiere                                       ural                    02
+            other: %d de fișiere                                                          17:0
+                                                                                          3:10
+
+term                                                                                      2025
+s_of                                                                                      -06-
+_use                                                                                      02
+                                                                                          17:0
+                                                                                          3:10
+
+intr        FUZZY: 0  PROOFREAD: 1  UPDATED: 2026-03-03 11:00:00                          2025
+o           <b>Bine ați venit!</b>                                                        -06-
+            Apăsați Start.                                                                02
+                                                                                          17:0
+                                                                                          3:10

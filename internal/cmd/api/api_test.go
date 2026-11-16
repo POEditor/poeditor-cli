@@ -20,9 +20,9 @@ func TestModuleCommands(t *testing.T) {
 		}
 		names[cmd.Name()] = true
 	}
-	for _, want := range []string{"projects", "pull", "push"} {
-		if !names[want] {
-			t.Errorf("%s missing from the api module; got %v", want, names)
-		}
+	// only the workflow commands sit at the top level; every endpoint is
+	// under `poeditor api`
+	if len(names) != 3 || !names["pull"] || !names["push"] || !names["api"] {
+		t.Errorf("api module commands = %v, want pull, push and api", names)
 	}
 }

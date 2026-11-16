@@ -93,6 +93,18 @@ func TestLoad_unknownKeyIsAnError(t *testing.T) {
 	}
 }
 
+// A file written before `name` became `alias` gets told how to fix it.
+func TestLoad_renamedKeyNamesTheFix(t *testing.T) {
+	path := write(t, t.TempDir(), "projects:\n  - id: 1\n    name: web\n    files: []\n")
+
+	_, err := repoconfig.Load(path)
+
+	want := path + `: line 3: field "name" was renamed to "alias" (rename it there)`
+	if err == nil || err.Error() != want {
+		t.Fatalf("got  %v\nwant %s", err, want)
+	}
+}
+
 func TestLoad_emptyFile(t *testing.T) {
 	cfg, err := repoconfig.Load(write(t, t.TempDir(), ""))
 

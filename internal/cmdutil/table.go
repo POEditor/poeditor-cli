@@ -35,6 +35,7 @@ type Table struct {
 	ios    *iostreams.IOStreams
 	header []string
 	rows   [][]string
+	mins   map[int]int // column → width it gets before the others share
 }
 
 // NewTable starts a table with the given column headers.
@@ -50,6 +51,18 @@ var (
 	// cell spans several lines anyway.
 	terminalCleaner = strings.NewReplacer("\t", " ", "\r\n", "\n", "\r", "\n")
 )
+
+// SetMinWidth reserves width display columns for column (0-based) before
+// the space is shared, so a cell's first line that must stay whole (a
+// translation's status line) is not wrapped; the other columns wrap more
+// instead. A column never gets more than its widest cell, and on a terminal
+// too narrow for the reservation it is ignored.
+func (t *Table) SetMinWidth(column, width int) {
+	if t.mins == nil {
+		t.mins = map[int]int{}
+	}
+	t.mins[column] = width
+}
 
 // AddRow adds one row.
 func (t *Table) AddRow(fields ...string) {
@@ -76,7 +89,7 @@ func (t *Table) Render() error {
 	}
 
 	lines := append([][]string{t.header}, t.rows...)
-	widths := fitColumns(naturalWidths(lines), t.ios.TerminalWidth())
+	widths := fitWithMinimums(naturalWidths(lines), t.mins, t.ios.TerminalWidth())
 	rows := make([][]string, len(t.rows))
 	wrapped := false
 	for i, row := range t.rows {
@@ -111,6 +124,40 @@ func naturalWidths(lines [][]string) []int {
 				widths[i] = max(widths[i], runewidth.StringWidth(line))
 			}
 		}
+	}
+	return widths
+}
+
+// fitWithMinimums is fitColumns after setting aside each minimum (capped to
+// the column's natural width): the reserved part is added back afterwards,
+// and those columns compete only for their width beyond it. If the
+// reservations would leave the other columns less than minColumnWidth each,
+// they are dropped.
+func fitWithMinimums(natural []int, mins map[int]int, total int) []int {
+	if total <= 0 || len(mins) == 0 {
+		return fitColumns(natural, total)
+	}
+	reserved := make([]int, len(natural))
+	sumReserved, others := 0, 0
+	for i, w := range natural {
+		if m, ok := mins[i]; ok {
+			reserved[i] = min(m, w)
+			sumReserved += reserved[i]
+		} else {
+			others++
+		}
+	}
+	gaps := columnGap * (len(natural) - 1)
+	if total-gaps-sumReserved < minColumnWidth*others {
+		return fitColumns(natural, total)
+	}
+	rest := make([]int, len(natural))
+	for i, w := range natural {
+		rest[i] = w - reserved[i]
+	}
+	widths := fitColumns(rest, total-sumReserved)
+	for i := range widths {
+		widths[i] += reserved[i]
 	}
 	return widths
 }

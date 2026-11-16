@@ -30,8 +30,9 @@ var layers = map[string][]string{
 // upper packages may use the foundation, and are used only from internal/cmd
 // (testutil excepted, as it builds the real root command).
 var upper = map[string][]string{
-	"cmdutil":  {"accounts", "api", "build", "config", "iostreams", "keyring", "prompt"},
-	"transfer": {"api", "cmdutil", "repoconfig"},
+	"cmdutil":     {"accounts", "api", "build", "config", "iostreams", "keyring", "prompt"},
+	"transfer":    {"api", "cmdutil", "repoconfig"},
+	"projectflag": {"api", "cmdutil", "repoconfig"},
 }
 
 func TestPackageLayers(t *testing.T) {

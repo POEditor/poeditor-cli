@@ -1,4 +1,4 @@
-// Package projects holds `poeditor projects ...`.
+// Package projects holds `poeditor api projects ...`.
 package projects
 
 import (
@@ -9,10 +9,7 @@ import (
 
 // NewCmdProjects returns the `projects` command group.
 func NewCmdProjects(f *cmdutil.Factory) *cobra.Command {
-	cmd := &cobra.Command{
-		Use:   "projects <command>",
-		Short: "Work with POEditor projects",
-	}
+	cmd := cmdutil.NewGroup("projects <command>", "Work with POEditor projects")
 	cmd.AddCommand(NewCmdList(f))
 	return cmd
 }

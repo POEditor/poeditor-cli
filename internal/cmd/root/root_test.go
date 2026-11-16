@@ -3,10 +3,14 @@ package root_test
 import (
 	"os"
 	"path/filepath"
+	"reflect"
 	"strings"
 	"testing"
 
+	"github.com/POEditor/poeditor-cli/internal/cmd/api/raw"
+	"github.com/POEditor/poeditor-cli/internal/cmd/root"
 	"github.com/POEditor/poeditor-cli/internal/cmdutil"
+	"github.com/POEditor/poeditor-cli/internal/iostreams"
 	"github.com/POEditor/poeditor-cli/internal/testutil"
 )
 
@@ -72,24 +76,64 @@ func TestEveryCommandDeclaresItsOutput(t *testing.T) {
 	}
 }
 
-// The api module's commands sit at the top level (`poeditor projects list`);
-// `poeditor api` is the raw request command (like `gh api`), a single leaf
-// with no subcommands: `poeditor api projects list` sends the raw request.
-func TestAPIModuleIsTopLevel(t *testing.T) {
-	var foundList, foundRaw bool
+// Only the workflow commands (pull, push) and the auth and config modules
+// sit at the top level. Every API v2 endpoint is exactly one command,
+// `poeditor api <group> <action>`, and nothing else lives under `api`.
+func TestCommandTree(t *testing.T) {
+	ios, _, _, _ := iostreams.Test()
+	var top []string
+	for _, cmd := range root.NewCmdRoot(&cmdutil.Factory{IO: ios}).Commands() {
+		if !cmd.Hidden && cmd.Name() != "help" {
+			top = append(top, cmd.Name())
+		}
+	}
+	if want := []string{"api", "auth", "config", "pull", "push"}; !reflect.DeepEqual(top, want) {
+		t.Errorf("top level = %v, want %v", top, want)
+	}
+
+	endpoints := map[string]bool{}
+	for _, endpoint := range raw.Endpoints {
+		group, action, _ := strings.Cut(endpoint, "/")
+		endpoints["poeditor api "+group+" "+raw.CommandName(action)] = true
+	}
+	found := map[string]bool{}
 	for _, cmd := range testutil.Leaves() {
-		switch cmd.CommandPath() {
-		case "poeditor projects list":
-			foundList = true
-		case "poeditor api":
-			foundRaw = true
-			if cmd.HasSubCommands() {
-				t.Error("`poeditor api` must have no subcommands")
+		path := cmd.CommandPath()
+		if !strings.HasPrefix(path, "poeditor api ") {
+			continue
+		}
+		if !endpoints[path] {
+			t.Errorf("%q is not an API v2 endpoint", path)
+		}
+		found[path] = true
+	}
+	for path := range endpoints {
+		if !found[path] {
+			t.Errorf("no command for %q", path)
+		}
+	}
+	for _, typed := range []string{"poeditor api projects list", "poeditor api terms list"} {
+		for _, cmd := range testutil.Leaves() {
+			if cmd.CommandPath() == typed && strings.HasSuffix(testutil.CommandPackage(cmd), "/raw") {
+				t.Errorf("%q is a raw command; it has a dedicated one", typed)
 			}
 		}
 	}
-	if !foundList || !foundRaw {
-		t.Fatalf("top level: projects list found = %v, api found = %v", foundList, foundRaw)
+}
+
+// A group run with a word that is not one of its commands fails, at every
+// level, instead of printing its help and exiting 0.
+func TestUnknownSubcommand(t *testing.T) {
+	for _, args := range [][]string{{"api", "nope"}, {"api", "terms", "nope"}, {"auth", "nope"}} {
+		res := testutil.Run(t, nil, args...)
+
+		if res.Err == nil || !strings.Contains(res.Err.Error(), `unknown command "nope"`) {
+			t.Errorf("%v: err = %v", args, res.Err)
+		}
+	}
+	res := testutil.Run(t, nil, "api", "terms")
+	if res.Err != nil || !strings.Contains(res.Stdout, "Available Commands") {
+		t.Errorf("a group alone shows its help: err = %v, stdout = %.80q", res.Err, res.Stdout)
 	}
 }
 

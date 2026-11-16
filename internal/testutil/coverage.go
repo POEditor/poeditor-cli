@@ -67,13 +67,14 @@ func Uncovered(pkg string) []string {
 	return missing
 }
 
-// Leaves returns every runnable command of the tree, cobra's built-ins excluded.
+// Leaves returns every runnable command of the tree that has no subcommands
+// (groups only route to them), cobra's built-ins excluded.
 func Leaves() []*cobra.Command {
 	ios, _, _, _ := iostreams.Test()
 	var out []*cobra.Command
 	var walk func(*cobra.Command)
 	walk = func(c *cobra.Command) {
-		if c.Runnable() && !strings.HasPrefix(CommandPackage(c), "github.com/spf13/") {
+		if c.Runnable() && !c.HasSubCommands() && !strings.HasPrefix(CommandPackage(c), "github.com/spf13/") {
 			out = append(out, c)
 		}
 		for _, sub := range c.Commands() {

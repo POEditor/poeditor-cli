@@ -1,0 +1,15 @@
+TERM          CONTEXT  TRANSLATION                                           PLURAL        REFERENCE  TAGS  COMMENT  CREATED     UPDATED
+save          button   FUZZY: 1  PROOFREAD: 0  UPDATED: 2026-03-01 08:00:00                           web            2026-01-14
+                       Salvează                                                                                      09:12:44
+
+files                  FUZZY: 0  PROOFREAD: 1  UPDATED: 2026-03-02 09:30:00  files_plural                            2025-06-02
+                       one: 1 fișier                                                                                 17:03:10
+                       few: %d fișiere
+                       other: %d de fișiere
+
+terms_of_use                                                                                                         2025-06-02
+                                                                                                                     17:03:10
+
+intro                  FUZZY: 0  PROOFREAD: 1  UPDATED: 2026-03-03 11:00:00                                          2025-06-02
+                       <b>Bine ați venit!</b>                                                                        17:03:10
+                       Apăsați Start.

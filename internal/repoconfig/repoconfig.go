@@ -10,6 +10,7 @@ import (
 	"io/fs"
 	"os"
 	"path/filepath"
+	"regexp"
 	"strconv"
 	"strings"
 
@@ -108,9 +109,34 @@ func Load(path string) (*Config, error) {
 	dec := yaml.NewDecoder(bytes.NewReader(data))
 	dec.KnownFields(true)
 	if err := dec.Decode(cfg); err != nil && !errors.Is(err, io.EOF) {
-		return nil, fmt.Errorf("%s: %s", path, strings.TrimPrefix(err.Error(), "yaml: "))
+		return nil, decodeError(path, err)
 	}
 	return cfg, nil
+}
+
+// renamedKeys are project keys that were renamed: old → new.
+var renamedKeys = map[string]string{"name": "alias"}
+
+var unknownProjectKey = regexp.MustCompile(`^(line \d+): field (\S+) not found in type repoconfig\.Project$`)
+
+// decodeError says what is wrong in the file, and how to fix a key that was
+// renamed since the file was written.
+func decodeError(path string, err error) error {
+	var typeErr *yaml.TypeError
+	if !errors.As(err, &typeErr) {
+		return fmt.Errorf("%s: %s", path, strings.TrimPrefix(err.Error(), "yaml: "))
+	}
+	problems := make([]string, len(typeErr.Errors))
+	for i, problem := range typeErr.Errors {
+		if m := unknownProjectKey.FindStringSubmatch(problem); m != nil && renamedKeys[m[2]] != "" {
+			problem = fmt.Sprintf("%s: field %q was renamed to %q (rename it there)", m[1], m[2], renamedKeys[m[2]])
+		}
+		problems[i] = problem
+	}
+	if len(problems) == 1 {
+		return fmt.Errorf("%s: %s", path, problems[0])
+	}
+	return fmt.Errorf("%s:\n  %s", path, strings.Join(problems, "\n  "))
 }
 
 // Path is the file the config was loaded from.

@@ -1,0 +1,6 @@
+TERM             CONTEXT  PLURAL        REFERENCE       TAGS     COMMENT                CREATED     UPDATED
+welcome_message  home                   src/home.js:12  web, v2  Shown on first launch  2026-01-14
+                                                                                        09:12:44
+
+files                     files_plural                                                  2025-06-02  2026-02-11
+                                                                                        17:03:10    10:15:00

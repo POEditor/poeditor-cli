@@ -1,0 +1,17 @@
+[
+  {
+    "term": "save",
+    "context": "",
+    "plural": "",
+    "reference": "",
+    "comment": "",
+    "tags": [],
+    "created": "2026-01-14T09:12:44+0000",
+    "updated": "",
+    "translation": {
+      "content": "Salvează",
+      "fuzzy": 0,
+      "updated": "2026-03-01T08:00:00+0000"
+    }
+  }
+]

@@ -1,0 +1,25 @@
+[
+  {
+    "term": "welcome_message",
+    "context": "home",
+    "plural": "",
+    "reference": "src/home.js:12",
+    "comment": "Shown on first launch",
+    "tags": [
+      "web",
+      "v2"
+    ],
+    "created": "2026-01-14T09:12:44+0000",
+    "updated": ""
+  },
+  {
+    "term": "files",
+    "context": "",
+    "plural": "files_plural",
+    "reference": "",
+    "comment": "",
+    "tags": [],
+    "created": "2025-06-02T17:03:10+0000",
+    "updated": "2026-02-11T10:15:00+0000"
+  }
+]

@@ -11,7 +11,7 @@ import (
 	"github.com/POEditor/poeditor-cli/internal/cmdutil"
 )
 
-// NewCmdList returns `poeditor projects list` (API v2 projects/list).
+// NewCmdList returns `poeditor api projects list` (API v2 projects/list).
 func NewCmdList(f *cmdutil.Factory) *cobra.Command {
 	var asJSON bool
 

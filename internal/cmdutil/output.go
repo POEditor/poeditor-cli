@@ -38,5 +38,6 @@ func annotate(cmd *cobra.Command, kind string) {
 func PrintJSON(ios *iostreams.IOStreams, v any) error {
 	enc := json.NewEncoder(ios.Out)
 	enc.SetIndent("", "  ")
+	enc.SetEscapeHTML(false) // translations hold HTML: <b>, not \u003cb\u003e
 	return enc.Encode(v)
 }

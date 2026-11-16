@@ -12,11 +12,11 @@ import (
 // parsedArgs is the command line of `poeditor api`, split by splitArgs.
 type parsedArgs struct {
 	ours       []string   // our own flags, for cmd.ParseFlags
-	positional []string   // <group> <action>, or <group>/<action>
+	positional []string   // none expected: the endpoint is the command
 	params     url.Values // every other --name value: an API parameter
 }
 
-// splitArgs separates the command line, since cobra cannot: an endpoint's
+// splitArgs separates a raw command's line, since cobra cannot: an endpoint's
 // parameters are not known in advance, so they can't be declared as flags.
 //
 //   - A flag the command knows (--json, --envelope, --upload, -f, -F, the
