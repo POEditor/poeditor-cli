@@ -13,5 +13,5 @@ func (c *Client) PostForTest(ctx context.Context, endpoint string, params url.Va
 }
 
 func (c *Client) UploadForTest(ctx context.Context, endpoint string, params url.Values, fileName string, data []byte, result any) error {
-	return c.upload(ctx, endpoint, params, fileName, data, result)
+	return c.upload(ctx, endpoint, params, File{Field: "file", Name: fileName, Data: data}, result)
 }

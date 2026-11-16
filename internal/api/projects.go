@@ -161,6 +161,6 @@ const CodeTooManyUploads = "4048"
 // ProjectsUpload calls projects/upload with one file (multipart field "file").
 func (c *Client) ProjectsUpload(ctx context.Context, projectID int, fileName string, data []byte, opts UploadOptions) (Stats, error) {
 	var result Stats
-	err := c.upload(ctx, "projects/upload", opts.values(projectID), fileName, data, &result)
+	err := c.upload(ctx, "projects/upload", opts.values(projectID), File{Field: "file", Name: fileName, Data: data}, &result)
 	return result, err
 }

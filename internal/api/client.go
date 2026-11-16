@@ -3,7 +3,8 @@
 //
 //	{"response": {"status": "success|fail", "code": "200", "message": "OK"}, "result": {...}}
 //
-// Layout: client.go is the transport (post, upload, Download, *Error); each
+// Layout: client.go is the transport (post, upload, Download, *Error, and
+// Raw for `poeditor api` only); each
 // API group has its own file (projects.go, languages.go…) with one exported
 // method per endpoint, named after it (projects/list → ProjectsList), plus its
 // result types and an options struct when the endpoint has optional
@@ -67,50 +68,68 @@ type envelope struct {
 	Result json.RawMessage `json:"result"`
 }
 
+// File is a file sent as a multipart form field.
+type File struct {
+	Field string // form field name; projects/upload expects "file"
+	Name  string // file name sent to the server
+	Data  []byte
+}
+
+// Response is an undecoded API response (see Raw).
+type Response struct {
+	Body   json.RawMessage // the whole envelope, as received
+	Result json.RawMessage // its "result"; nil when the endpoint returns none
+}
+
+// Raw sends params (and file, unless nil) to any endpoint and returns the
+// response undecoded. An API failure returns the Response and an *Error.
+// Only `poeditor api` uses it: every other command calls a typed method.
+func (c *Client) Raw(ctx context.Context, endpoint string, params url.Values, file *File) (Response, error) {
+	env, body, err := c.send(ctx, endpoint, params, file)
+	return Response{Body: body, Result: env.Result}, err
+}
+
 // post calls endpoint (e.g. "projects/list") with params and decodes the
 // "result" object into result (which may be nil).
 func (c *Client) post(ctx context.Context, endpoint string, params url.Values, result any) error {
-	form := url.Values{}
-	for key, values := range params {
-		form[key] = values
-	}
-	form.Set("api_token", c.Token)
-	return c.do(ctx, endpoint, "application/x-www-form-urlencoded", strings.NewReader(form.Encode()), result)
-}
-
-// upload calls endpoint as multipart/form-data with params plus one file in
-// the form field "file" (projects/upload).
-func (c *Client) upload(ctx context.Context, endpoint string, params url.Values, fileName string, data []byte, result any) error {
-	var body bytes.Buffer
-	mw := multipart.NewWriter(&body)
-	for key, values := range params {
-		for _, v := range values {
-			if err := mw.WriteField(key, v); err != nil {
-				return err
-			}
-		}
-	}
-	if err := mw.WriteField("api_token", c.Token); err != nil {
-		return err
-	}
-	part, err := mw.CreateFormFile("file", fileName)
+	env, _, err := c.send(ctx, endpoint, params, nil)
 	if err != nil {
 		return err
 	}
-	if _, err := part.Write(data); err != nil {
-		return err
-	}
-	if err := mw.Close(); err != nil {
-		return err
-	}
-	return c.do(ctx, endpoint, mw.FormDataContentType(), &body, result)
+	return decodeResult(endpoint, env, result)
 }
 
-func (c *Client) do(ctx context.Context, endpoint, contentType string, reqBody io.Reader, result any) error {
+// upload is post as multipart/form-data, with one file.
+func (c *Client) upload(ctx context.Context, endpoint string, params url.Values, file File, result any) error {
+	env, _, err := c.send(ctx, endpoint, params, &file)
+	if err != nil {
+		return err
+	}
+	return decodeResult(endpoint, env, result)
+}
+
+func decodeResult(endpoint string, env envelope, result any) error {
+	if result == nil || len(env.Result) == 0 {
+		return nil
+	}
+	if err := json.Unmarshal(env.Result, result); err != nil {
+		return fmt.Errorf("unexpected API result for %s: %w", endpoint, err)
+	}
+	return nil
+}
+
+// send POSTs params plus api_token (a url-encoded form, or multipart when
+// file is set) and returns the decoded envelope with the raw body. A "fail"
+// response returns both and an *Error.
+func (c *Client) send(ctx context.Context, endpoint string, params url.Values, file *File) (envelope, []byte, error) {
+	contentType, reqBody, err := c.encode(params, file)
+	if err != nil {
+		return envelope{}, nil, err
+	}
 	endpointURL := strings.TrimRight(c.BaseURL, "/") + "/" + strings.TrimLeft(endpoint, "/")
 	req, err := http.NewRequestWithContext(ctx, http.MethodPost, endpointURL, reqBody)
 	if err != nil {
-		return err
+		return envelope{}, nil, err
 	}
 	req.Header.Set("Content-Type", contentType)
 	if c.UserAgent != "" {
@@ -119,29 +138,57 @@ func (c *Client) do(ctx context.Context, endpoint, contentType string, reqBody i
 
 	resp, err := c.HTTP.Do(req)
 	if err != nil {
-		return fmt.Errorf("cannot reach the POEditor API: %w", err)
+		return envelope{}, nil, fmt.Errorf("cannot reach the POEditor API: %w", err)
 	}
 	defer resp.Body.Close()
 
 	body, err := io.ReadAll(resp.Body)
 	if err != nil {
-		return fmt.Errorf("cannot read the API response: %w", err)
+		return envelope{}, nil, fmt.Errorf("cannot read the API response: %w", err)
 	}
 
 	var env envelope
 	if err := json.Unmarshal(body, &env); err != nil {
-		return fmt.Errorf("unexpected API response (HTTP %d): %s", resp.StatusCode, snippet(body))
+		return envelope{}, nil, fmt.Errorf("unexpected API response (HTTP %d): %s", resp.StatusCode, snippet(body))
 	}
 	if env.Response.Status != "success" {
-		return &Error{Code: env.Response.Code, Message: env.Response.Message}
+		return env, body, &Error{Code: env.Response.Code, Message: env.Response.Message}
 	}
-	if result == nil || len(env.Result) == 0 {
-		return nil
+	return env, body, nil
+}
+
+// encode builds the request body: params plus api_token, url-encoded, or
+// multipart/form-data when there is a file.
+func (c *Client) encode(params url.Values, file *File) (contentType string, body io.Reader, err error) {
+	form := url.Values{}
+	for key, values := range params {
+		form[key] = values
 	}
-	if err := json.Unmarshal(env.Result, result); err != nil {
-		return fmt.Errorf("unexpected API result for %s: %w", endpoint, err)
+	form.Set("api_token", c.Token)
+	if file == nil {
+		return "application/x-www-form-urlencoded", strings.NewReader(form.Encode()), nil
 	}
-	return nil
+
+	var buf bytes.Buffer
+	mw := multipart.NewWriter(&buf)
+	for key, values := range form {
+		for _, v := range values {
+			if err := mw.WriteField(key, v); err != nil {
+				return "", nil, err
+			}
+		}
+	}
+	part, err := mw.CreateFormFile(file.Field, file.Name)
+	if err != nil {
+		return "", nil, err
+	}
+	if _, err := part.Write(file.Data); err != nil {
+		return "", nil, err
+	}
+	if err := mw.Close(); err != nil {
+		return "", nil, err
+	}
+	return mw.FormDataContentType(), &buf, nil
 }
 
 func snippet(body []byte) string {

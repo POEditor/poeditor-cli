@@ -72,19 +72,25 @@ func TestEveryCommandDeclaresItsOutput(t *testing.T) {
 	}
 }
 
-// The api module sits at the top level and has no `poeditor api …` spelling
-// (that name stays free for a raw API request command, like `gh api`).
+// The api module's commands sit at the top level (`poeditor projects list`);
+// `poeditor api` is the raw request command (like `gh api`), a single leaf
+// with no subcommands: `poeditor api projects list` sends the raw request.
 func TestAPIModuleIsTopLevel(t *testing.T) {
+	var foundList, foundRaw bool
 	for _, cmd := range testutil.Leaves() {
-		if cmd.CommandPath() == "poeditor projects list" {
-			res := testutil.Run(t, nil, "api", "projects", "list")
-			if res.Err == nil || !strings.Contains(res.Err.Error(), `unknown command "api"`) {
-				t.Fatalf("`poeditor api …` should not exist, got %v", res.Err)
+		switch cmd.CommandPath() {
+		case "poeditor projects list":
+			foundList = true
+		case "poeditor api":
+			foundRaw = true
+			if cmd.HasSubCommands() {
+				t.Error("`poeditor api` must have no subcommands")
 			}
-			return
 		}
 	}
-	t.Fatal(`"poeditor projects list" not found at the top level`)
+	if !foundList || !foundRaw {
+		t.Fatalf("top level: projects list found = %v, api found = %v", foundList, foundRaw)
+	}
 }
 
 func dirHasTestMain(t *testing.T, dir string) bool {

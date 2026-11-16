@@ -37,6 +37,7 @@ type Env struct {
 	Vars      map[string]string // environment variables seen by the CLI
 	Stdin     string
 	TTY       bool   // stdout is a terminal (default) or a pipe (false)
+	Width     int    // terminal width in columns; 0 (default) = tables are not fitted
 	WorkDir   string // the "current directory" (default: a temp dir)
 	// Prompter answers prompts; nil means not interactive. Use Answer().
 	Prompter *Prompter
@@ -103,6 +104,7 @@ func (e *Env) Run(args ...string) Result {
 	ios, stdin, stdout, stderr := iostreams.Test()
 	stdin.WriteString(e.Stdin)
 	ios.SetStdoutTTY(e.TTY)
+	ios.SetTerminalWidth(e.Width)
 
 	baseURL := "http://127.0.0.1:1/unreachable/"
 	if e.Fake != nil {
