@@ -14,14 +14,6 @@ import (
 	"github.com/POEditor/poeditor-cli/internal/transfer"
 )
 
-// Result is one file in one language, as reported by --json.
-type Result struct {
-	Project  transfer.ProjectRef `json:"project"`
-	File     string              `json:"file"`
-	Language string              `json:"language"`
-	Status   string              `json:"status"`
-}
-
 // NewCmdPull returns `poeditor pull`.
 func NewCmdPull(f *cmdutil.Factory) *cobra.Command {
 	var (
@@ -58,7 +50,7 @@ written before it stay written.`,
 				return err
 			}
 
-			results := []Result{}
+			results := []transfer.FileResult{}
 			runErr := func() error {
 				for _, p := range projects {
 					client, err := transfer.Client(f, p)
@@ -78,11 +70,8 @@ written before it stay written.`,
 						if err != nil {
 							return &transfer.ErrStopped{Display: item.Display, Err: err}
 						}
-						if dryRun && status != transfer.Unchanged {
-							status = "would_" + strings.TrimSuffix(status, "d") // would_create, would_update
-						}
-						results = append(results, Result{Project: transfer.Ref(p), File: item.Display, Language: item.Language, Status: status})
-						fmt.Fprintf(f.IO.ErrOut, "%-14s %s\n", strings.ReplaceAll(status, "_", " "), item.Display)
+						results = append(results, item.Result(status))
+						fmt.Fprintf(f.IO.ErrOut, "%-14s %s\n", strings.ReplaceAll(string(status), "_", " "), item.Display)
 					}
 				}
 				return nil
@@ -109,7 +98,7 @@ written before it stay written.`,
 }
 
 // pullOne exports one file in one language and writes it.
-func pullOne(cmd *cobra.Command, client *api.Client, item transfer.Item, dryRun bool) (string, error) {
+func pullOne(cmd *cobra.Command, client *api.Client, item transfer.Item, dryRun bool) (transfer.Status, error) {
 	link, err := client.ProjectsExport(cmd.Context(), item.Project.ID, exportOptions(item))
 	if err != nil {
 		return "", err
@@ -134,8 +123,8 @@ func exportOptions(item transfer.Item) api.ExportOptions {
 	return opts
 }
 
-func summary(results []Result, dryRun bool) string {
-	counts := map[string]int{}
+func summary(results []transfer.FileResult, dryRun bool) string {
+	counts := map[transfer.Status]int{}
 	for _, r := range results {
 		counts[r.Status]++
 	}
@@ -145,7 +134,7 @@ func summary(results []Result, dryRun bool) string {
 	}
 	if dryRun {
 		return fmt.Sprintf("%d %s: %d would be created, %d would be updated, %d unchanged (dry run: nothing was written)",
-			len(results), files, counts["would_create"], counts["would_update"], counts[transfer.Unchanged])
+			len(results), files, counts[transfer.WouldCreate], counts[transfer.WouldUpdate], counts[transfer.Unchanged])
 	}
 	return fmt.Sprintf("%d %s: %d created, %d updated, %d unchanged",
 		len(results), files, counts[transfer.Created], counts[transfer.Updated], counts[transfer.Unchanged])

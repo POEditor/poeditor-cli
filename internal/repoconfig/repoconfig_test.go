@@ -273,3 +273,18 @@ func TestLocalPath(t *testing.T) {
 		t.Errorf("pt-br: %q, want %q", got, want)
 	}
 }
+
+func TestProject_Ref(t *testing.T) {
+	cases := []struct {
+		project repoconfig.Project
+		want    repoconfig.ProjectRef
+	}{
+		{repoconfig.Project{ID: 4321, Alias: "web", Account: "client-a"}, repoconfig.ProjectRef{ID: 4321, Alias: "web"}},
+		{repoconfig.Project{ID: 4321}, repoconfig.ProjectRef{ID: 4321}},
+	}
+	for _, tc := range cases {
+		if got := tc.project.Ref(); got != tc.want {
+			t.Errorf("Ref(%+v) = %+v, want %+v", tc.project, got, tc.want)
+		}
+	}
+}

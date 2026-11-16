@@ -94,24 +94,16 @@ func (r checkReport) allIssues() []repoconfig.Issue {
 }
 
 type projectReport struct {
-	Project   projectRef         `json:"project"`
-	Account   string             `json:"account"`
-	Languages []string           `json:"languages"` // the project's language codes
-	Issues    []repoconfig.Issue `json:"issues"`
+	Project   repoconfig.ProjectRef `json:"project"`
+	Account   string                `json:"account"`
+	Languages []string              `json:"languages"` // the project's language codes
+	Issues    []repoconfig.Issue    `json:"issues"`
 
 	label string
 }
 
-// projectRef is how JSON output names a project: its id, the alias from
-// .poeditor.yml (if any) and, when the command fetched it, its POEditor name.
-type projectRef struct {
-	ID    int    `json:"id"`
-	Alias string `json:"alias,omitempty"`
-	Name  string `json:"name,omitempty"`
-}
-
 func checkProject(cmd *cobra.Command, f *cmdutil.Factory, p repoconfig.Project) projectReport {
-	rep := projectReport{Project: projectRef{ID: p.ID, Alias: p.Alias}, Languages: []string{}, Issues: []repoconfig.Issue{}, label: p.Label()}
+	rep := projectReport{Project: p.Ref(), Languages: []string{}, Issues: []repoconfig.Issue{}, label: p.Label()}
 	fail := func(sev repoconfig.Severity, msg string) {
 		rep.Issues = append(rep.Issues, repoconfig.Issue{Severity: sev, Where: "project " + p.Label(), Message: msg})
 	}

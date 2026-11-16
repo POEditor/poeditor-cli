@@ -6,7 +6,8 @@ import (
 	"net/url"
 )
 
-// Project is one entry of projects/list.
+// Project is the short project shape: one entry of projects/list
+// (server: ApiV2_Projects_List::formatResponse).
 type Project struct {
 	ID      int    `json:"id"`
 	Name    string `json:"name"`
@@ -26,18 +27,15 @@ func (c *Client) ProjectsList(ctx context.Context) ([]Project, error) {
 	return result.Projects, nil
 }
 
-// ProjectDetails is the result of projects/view
+// ProjectDetails is the full project shape: the short one plus settings and
+// term counts. Returned by projects/view, projects/add and projects/update
 // (server: ApiV2_Projects::generateProjectArray).
 type ProjectDetails struct {
-	ID                int    `json:"id"`
-	Name              string `json:"name"`
+	Project
 	Description       string `json:"description"`
-	Public            int    `json:"public"`
-	Open              int    `json:"open"`
-	ReferenceLanguage string `json:"reference_language"`
-	FallbackLanguage  string `json:"fallback_language"`
+	ReferenceLanguage string `json:"reference_language"` // code, or ""
+	FallbackLanguage  string `json:"fallback_language"`  // code, or ""
 	Terms             int    `json:"terms"`
-	Created           string `json:"created"`
 }
 
 // ProjectsView calls projects/view: one project's details.
@@ -156,28 +154,13 @@ func (o UploadOptions) values(projectID int) url.Values {
 	return params
 }
 
-// UploadResult is what projects/upload changed
-// (server: ApiV2_Projects_Upload, "terms" and "translations").
-type UploadResult struct {
-	Terms *struct {
-		Parsed  int `json:"parsed"`
-		Added   int `json:"added"`
-		Deleted int `json:"deleted"`
-	} `json:"terms,omitempty"`
-	Translations *struct {
-		Parsed  int `json:"parsed"`
-		Added   int `json:"added"`
-		Updated int `json:"updated"`
-	} `json:"translations,omitempty"`
-}
-
 // CodeTooManyUploads is the projects/upload rate-limit code
 // ("Too many upload requests": one upload every 10s paid, 20s free).
 const CodeTooManyUploads = "4048"
 
 // ProjectsUpload calls projects/upload with one file (multipart field "file").
-func (c *Client) ProjectsUpload(ctx context.Context, projectID int, fileName string, data []byte, opts UploadOptions) (UploadResult, error) {
-	var result UploadResult
+func (c *Client) ProjectsUpload(ctx context.Context, projectID int, fileName string, data []byte, opts UploadOptions) (Stats, error) {
+	var result Stats
 	err := c.upload(ctx, "projects/upload", opts.values(projectID), fileName, data, &result)
 	return result, err
 }

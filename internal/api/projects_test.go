@@ -193,3 +193,19 @@ func TestUploadTags_String(t *testing.T) {
 		t.Errorf("all groups = %q", got)
 	}
 }
+
+func TestProjectsUpload_multiLanguageDetails(t *testing.T) {
+	var rec recorder
+	client := rec.client(t, `{"terms":{"parsed":2,"added":0,"deleted":0},"translations":{"parsed":0,"added":0,"updated":0,`+
+		`"details":[{"language":{"name":"French","code":"fr"},"parsed":2,"added":1,"updated":1}]}}`)
+
+	res, err := client.ProjectsUpload(context.Background(), 7717, "all.xliff", nil, api.UploadOptions{Updating: "translations"})
+
+	if err != nil {
+		t.Fatal(err)
+	}
+	want := []api.LanguageStats{{Language: api.LanguageRef{Name: "French", Code: "fr"}, Parsed: 2, Added: 1, Updated: 1}}
+	if res.Translations == nil || !reflect.DeepEqual(res.Translations.Details, want) {
+		t.Errorf("translations = %+v", res.Translations)
+	}
+}

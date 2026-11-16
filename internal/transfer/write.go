@@ -8,18 +8,11 @@ import (
 	"path/filepath"
 )
 
-// Write statuses (pull).
-const (
-	Created   = "created"
-	Updated   = "updated"
-	Unchanged = "unchanged"
-)
-
 // WriteFile puts data at path unless the file already holds exactly that.
 // The write is atomic: a temp file in the same directory, then a rename, so
 // an interrupted pull never leaves half a file. With dryRun nothing is
-// written; the status says what would happen.
-func WriteFile(path string, data []byte, dryRun bool) (string, error) {
+// written and the status is WouldCreate or WouldUpdate.
+func WriteFile(path string, data []byte, dryRun bool) (Status, error) {
 	old, err := os.ReadFile(path)
 	status := Updated
 	switch {
@@ -31,7 +24,7 @@ func WriteFile(path string, data []byte, dryRun bool) (string, error) {
 		return Unchanged, nil
 	}
 	if dryRun {
-		return status, nil
+		return status.dryRun(), nil
 	}
 
 	mode := fs.FileMode(0o644)

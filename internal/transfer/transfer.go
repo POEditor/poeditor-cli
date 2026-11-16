@@ -40,15 +40,6 @@ func LoadConfig(f *cmdutil.Factory) (*repoconfig.Config, error) {
 	return cfg, nil
 }
 
-// ProjectRef names a project in JSON output.
-type ProjectRef struct {
-	ID    int    `json:"id"`
-	Alias string `json:"alias,omitempty"`
-}
-
-// Ref returns the JSON reference of a project.
-func Ref(p repoconfig.Project) ProjectRef { return ProjectRef{ID: p.ID, Alias: p.Alias} }
-
 // Item is one file in one language of one project.
 type Item struct {
 	Project  repoconfig.Project

@@ -30,18 +30,40 @@ const (
 
 // Statuses.
 const (
-	Uploaded    = "uploaded"
-	Missing     = "missing"
-	WouldUpload = "would_upload"
+	Uploaded    transfer.Status = "uploaded"
+	Missing     transfer.Status = "missing"
+	WouldUpload transfer.Status = "would_upload"
 )
 
 // Result is one file in one language, as reported by --json.
 type Result struct {
-	Project  transfer.ProjectRef `json:"project"`
-	File     string              `json:"file"`
-	Language string              `json:"language"`
-	Status   string              `json:"status"`
-	api.UploadResult
+	transfer.FileResult
+	Terms        *TermCounts        `json:"terms,omitempty"`
+	Translations *TranslationCounts `json:"translations,omitempty"`
+}
+
+// TermCounts are the term counts of one upload in --json.
+type TermCounts struct {
+	Parsed  int `json:"parsed"`
+	Added   int `json:"added"`
+	Deleted int `json:"deleted"`
+}
+
+// TranslationCounts are the translation counts of one upload in --json.
+type TranslationCounts struct {
+	Parsed  int `json:"parsed"`
+	Added   int `json:"added"`
+	Updated int `json:"updated"`
+}
+
+// setCounts copies what --json reports from the API's stats.
+func (r *Result) setCounts(s api.Stats) {
+	if t := s.Terms; t != nil {
+		r.Terms = &TermCounts{Parsed: t.Parsed, Added: t.Added, Deleted: t.Deleted}
+	}
+	if t := s.Translations; t != nil {
+		r.Translations = &TranslationCounts{Parsed: t.Parsed, Added: t.Added, Updated: t.Updated}
+	}
 }
 
 // upload is one planned upload.
@@ -104,7 +126,7 @@ if a source file is missing or a format cannot be uploaded.`,
 			runErr := func() error {
 				uploads := 0
 				for _, u := range plan {
-					res := Result{Project: transfer.Ref(u.Project), File: u.Display, Language: u.Language}
+					res := Result{FileResult: u.Result("")}
 					data, err := os.ReadFile(u.Path)
 					if errors.Is(err, fs.ErrNotExist) {
 						res.Status = Missing
@@ -131,7 +153,8 @@ if a source file is missing or a format cannot be uploaded.`,
 						return &transfer.ErrStopped{Display: u.Display, Err: err}
 					}
 					uploads++
-					res.Status, res.UploadResult = Uploaded, counts
+					res.Status = Uploaded
+					res.setCounts(counts)
 					results = append(results, res)
 					fmt.Fprintf(f.IO.ErrOut, "%-14s %s (%s)  %s\n", "uploaded", u.Display, u.Language, describeCounts(counts))
 				}
@@ -209,7 +232,7 @@ func makePlan(cmd *cobra.Command, f *cmdutil.Factory, cfg *repoconfig.Config, pr
 }
 
 // send uploads one file, waiting and retrying while the API says it is too early.
-func send(cmd *cobra.Command, f *cmdutil.Factory, u upload, data []byte) (api.UploadResult, error) {
+func send(cmd *cobra.Command, f *cmdutil.Factory, u upload, data []byte) (api.Stats, error) {
 	for attempt := 0; ; attempt++ {
 		counts, err := u.client.ProjectsUpload(cmd.Context(), u.Project.ID, filepath.Base(u.Path), data, u.opts)
 		var apiErr *api.Error
@@ -272,7 +295,7 @@ func describe(u upload) string {
 }
 
 // describeCounts is the stderr detail of a finished upload.
-func describeCounts(c api.UploadResult) string {
+func describeCounts(c api.Stats) string {
 	var parts []string
 	if t := c.Terms; t != nil {
 		parts = append(parts, fmt.Sprintf("terms: %d parsed, %d added, %d deleted", t.Parsed, t.Added, t.Deleted))

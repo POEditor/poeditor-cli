@@ -61,13 +61,13 @@ func TestWriteFile(t *testing.T) {
 	steps := []struct {
 		data   string
 		dryRun bool
-		want   string
+		want   transfer.Status
 		onDisk string // "" = file must not exist
 	}{
-		{"v1", true, transfer.Created, ""},
+		{"v1", true, transfer.WouldCreate, ""},
 		{"v1", false, transfer.Created, "v1"},
 		{"v1", false, transfer.Unchanged, "v1"},
-		{"v2", true, transfer.Updated, "v1"},
+		{"v2", true, transfer.WouldUpdate, "v1"},
 		{"v2", false, transfer.Updated, "v2"},
 	}
 	for i, s := range steps {

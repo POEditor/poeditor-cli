@@ -119,6 +119,17 @@ func (c *Config) Path() string { return c.path }
 // Dir is the directory file paths are relative to.
 func (c *Config) Dir() string { return filepath.Dir(c.path) }
 
+// ProjectRef is how JSON output names a project: its id, the alias from
+// .poeditor.yml (if any) and, when the command fetched it, its POEditor name.
+type ProjectRef struct {
+	ID    int    `json:"id"`
+	Alias string `json:"alias,omitempty"`
+	Name  string `json:"name,omitempty"`
+}
+
+// Ref returns the project's JSON reference (without the POEditor name).
+func (p Project) Ref() ProjectRef { return ProjectRef{ID: p.ID, Alias: p.Alias} }
+
 // Label is how a project is named in messages: its alias, else its id.
 func (p Project) Label() string {
 	if p.Alias != "" {

@@ -19,7 +19,7 @@ func TestLanguagesList(t *testing.T) {
 		t.Fatal(err)
 	}
 	rec.assertForm(t, "languages/list", url.Values{"id": {"7717"}})
-	if want := []api.Language{{Name: "French", Code: "fr", Translations: 10}}; !reflect.DeepEqual(langs, want) {
+	if want := []api.Language{{LanguageRef: api.LanguageRef{Name: "French", Code: "fr"}, Translations: 10}}; !reflect.DeepEqual(langs, want) {
 		t.Errorf("languages = %+v", langs)
 	}
 }
