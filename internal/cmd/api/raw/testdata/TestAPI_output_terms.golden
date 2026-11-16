@@ -1,13 +1,13 @@
-TERM                                      CONTEXT  CREATED        UPDATED     TAGS
+TERM                                      CONTEXT  CREATED        UPDATED               TAGS
 release_note                                       2026-01-14
                                                    09:12:44
 
 2026-01-14T09:12:44+0000 was the release  home     2025-06-02     2026-03-01
                                                    17:03:10       08:00:00
 
-offset                                             2026-02-01     2026-02-02
-                                                   10:00:00+0200  10:00:00
+offset                                             2026-02-01     2026-02-02T10:00:00Z
+                                                   10:00:00+0200
 
-tagged                                                                        web, v2, beta
+tagged                                                                                  web, v2, beta
 
-nested                                                                        [{"a":1},["b"]]
+nested                                                                                  [{"a":1},["b"]]

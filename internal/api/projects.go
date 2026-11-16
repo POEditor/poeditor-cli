@@ -13,7 +13,7 @@ type Project struct {
 	Name    string `json:"name"`
 	Public  int    `json:"public"`
 	Open    int    `json:"open"`
-	Created string `json:"created"`
+	Created Time   `json:"created"`
 }
 
 // ProjectsList calls projects/list: every project the token can access.

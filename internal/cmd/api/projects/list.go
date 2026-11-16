@@ -58,7 +58,7 @@ func printProjects(f *cmdutil.Factory, projects []api.Project, asJSON bool) erro
 	}
 	table := cmdutil.NewTable(f.IO, "ID", "NAME", "PUBLIC", "OPEN", "CREATED")
 	for _, p := range projects {
-		table.AddRow(strconv.Itoa(p.ID), p.Name, yesNo(p.Public), yesNo(p.Open), p.Created)
+		table.AddRow(strconv.Itoa(p.ID), p.Name, yesNo(p.Public), yesNo(p.Open), cmdutil.TimeCell(f.IO, p.Created))
 	}
 	return table.Render()
 }

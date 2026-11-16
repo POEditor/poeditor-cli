@@ -4,9 +4,9 @@ import (
 	"bytes"
 	"encoding/json"
 	"fmt"
-	"regexp"
 	"strings"
 
+	"github.com/POEditor/poeditor-cli/internal/api"
 	"github.com/POEditor/poeditor-cli/internal/cmdutil"
 )
 
@@ -79,7 +79,7 @@ func printList(f *cmdutil.Factory, items []json.RawMessage) error {
 		fields := make([]string, len(columns))
 		for i, c := range columns {
 			if f.IO.IsStdoutTTY() {
-				fields[i] = terminalCell(row[c])
+				fields[i] = terminalCell(f, row[c])
 			} else {
 				fields[i] = cell(row[c])
 			}
@@ -144,13 +144,18 @@ func cell(raw json.RawMessage) string {
 }
 
 // terminalCell is a value as a person reads it: a list of plain values
-// (tags) joined with ", ", and a date-time on two lines. Piped output keeps
+// (tags) joined with ", ", and a date as every command shows one
+// (cmdutil.TimeCell). Piped output keeps
 // cell's form, which scripts can parse (a tag may itself contain a comma).
-func terminalCell(raw json.RawMessage) string {
+func terminalCell(f *cmdutil.Factory, raw json.RawMessage) string {
 	if joined, ok := joinValues(raw); ok {
 		return joined
 	}
-	return splitDateTime(cell(raw))
+	text := cell(raw)
+	if t, err := api.ParseTime(text); err == nil { // a date, as the API writes them
+		return cmdutil.TimeCell(f.IO, t)
+	}
+	return text
 }
 
 // joinValues joins a list of strings, numbers or booleans with ", "; ok is
@@ -168,25 +173,6 @@ func joinValues(raw json.RawMessage) (string, bool) {
 		values[i] = cell(item)
 	}
 	return strings.Join(values, ", "), true
-}
-
-// dateTime is how API v2 sends dates: 2026-01-14T09:12:44+0000.
-var dateTime = regexp.MustCompile(`^(\d{4}-\d{2}-\d{2})T(\d{2}:\d{2}:\d{2})([+-]\d{2}:?\d{2}|Z)?$`)
-
-// splitDateTime puts a date-time's time on the line below its date, so date
-// columns stay narrow. A UTC offset (which API v2 always sends) is left out;
-// any other offset is kept. Text that is not exactly a date-time is returned
-// as it is.
-func splitDateTime(s string) string {
-	m := dateTime.FindStringSubmatch(s)
-	if m == nil {
-		return s
-	}
-	switch m[3] {
-	case "", "Z", "+0000", "+00:00", "-0000", "-00:00":
-		return m[1] + "\n" + m[2]
-	}
-	return m[1] + "\n" + m[2] + m[3]
 }
 
 func isNull(raw json.RawMessage) bool {

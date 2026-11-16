@@ -7,6 +7,7 @@ import (
 	"net/url"
 	"reflect"
 	"testing"
+	"time"
 
 	"github.com/POEditor/poeditor-cli/internal/api"
 )
@@ -64,7 +65,7 @@ func TestProjectsList(t *testing.T) {
 		t.Fatal(err)
 	}
 	rec.assertForm(t, "projects/list", url.Values{})
-	want := []api.Project{{ID: 7717, Name: "Web", Open: 1, Created: "2024-01-02T03:04:05+0000"}}
+	want := []api.Project{{ID: 7717, Name: "Web", Open: 1, Created: api.Time{Time: time.Date(2024, 1, 2, 3, 4, 5, 0, time.UTC)}}}
 	if !reflect.DeepEqual(projects, want) {
 		t.Errorf("projects = %+v", projects)
 	}
