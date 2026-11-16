@@ -6,11 +6,9 @@ import (
 	"errors"
 	"fmt"
 	"io/fs"
-	"net/url"
 	"os"
 	"path/filepath"
 	"slices"
-	"strconv"
 	"strings"
 	"time"
 
@@ -28,8 +26,6 @@ const (
 	UploadDelay = 10 * time.Second
 	// MaxRetries is how many times one upload is retried after 4048.
 	MaxRetries = 3
-	// tooManyUploads is the API's "Too many upload requests" code.
-	tooManyUploads = "4048"
 )
 
 // Statuses.
@@ -39,35 +35,20 @@ const (
 	WouldUpload = "would_upload"
 )
 
-// Counts are what one upload changed.
-type Counts struct {
-	Terms *struct {
-		Parsed  int `json:"parsed"`
-		Added   int `json:"added"`
-		Deleted int `json:"deleted"`
-	} `json:"terms,omitempty"`
-	Translations *struct {
-		Parsed  int `json:"parsed"`
-		Added   int `json:"added"`
-		Updated int `json:"updated"`
-	} `json:"translations,omitempty"`
-}
-
 // Result is one file in one language, as reported by --json.
 type Result struct {
 	Project  transfer.ProjectRef `json:"project"`
 	File     string              `json:"file"`
 	Language string              `json:"language"`
 	Status   string              `json:"status"`
-	Counts
+	api.UploadResult
 }
 
 // upload is one planned upload.
 type upload struct {
 	transfer.Item
-	client   *api.Client
-	updating string
-	source   bool
+	client *api.Client
+	opts   api.UploadOptions
 }
 
 // NewCmdPush returns `poeditor push`.
@@ -150,9 +131,9 @@ if a source file is missing or a format cannot be uploaded.`,
 						return &transfer.ErrStopped{Display: u.Display, Err: err}
 					}
 					uploads++
-					res.Status, res.Counts = Uploaded, counts
+					res.Status, res.UploadResult = Uploaded, counts
 					results = append(results, res)
-					fmt.Fprintf(f.IO.ErrOut, "%-14s %s (%s)  %s\n", "uploaded", u.Display, u.Language, counts)
+					fmt.Fprintf(f.IO.ErrOut, "%-14s %s (%s)  %s\n", "uploaded", u.Display, u.Language, describeCounts(counts))
 				}
 				return nil
 			}()
@@ -198,7 +179,7 @@ func makePlan(cmd *cobra.Command, f *cmdutil.Factory, cfg *repoconfig.Config, pr
 
 		langs := []string{p.SourceLanguage}
 		if translations {
-			if langs, err = transfer.ProjectLanguages(cmd.Context(), client, p.ID); err != nil {
+			if langs, err = client.LanguageCodes(cmd.Context(), p.ID); err != nil {
 				return nil, fmt.Errorf("project %s: %w", p.Label(), err)
 			}
 		}
@@ -221,27 +202,18 @@ func makePlan(cmd *cobra.Command, f *cmdutil.Factory, cfg *repoconfig.Config, pr
 					return nil, fmt.Errorf("%s: source file not found (project %s, source_language %s); nothing was uploaded", item.Display, p.Label(), p.SourceLanguage)
 				}
 			}
-			updating := "translations"
-			if source {
-				updating = "terms_translations"
-				if item.File.Push != nil && item.File.Push.Updating != "" {
-					updating = item.File.Push.Updating
-				}
-			}
-			plan = append(plan, upload{Item: item, client: client, updating: updating, source: source})
+			plan = append(plan, upload{Item: item, client: client, opts: uploadOptions(item, source)})
 		}
 	}
 	return plan, nil
 }
 
 // send uploads one file, waiting and retrying while the API says it is too early.
-func send(cmd *cobra.Command, f *cmdutil.Factory, u upload, data []byte) (Counts, error) {
-	params := Params(u.Item, u.updating, u.source)
+func send(cmd *cobra.Command, f *cmdutil.Factory, u upload, data []byte) (api.UploadResult, error) {
 	for attempt := 0; ; attempt++ {
-		var counts Counts
-		err := u.client.Upload(cmd.Context(), "projects/upload", params, filepath.Base(u.Path), data, &counts)
+		counts, err := u.client.ProjectsUpload(cmd.Context(), u.Project.ID, filepath.Base(u.Path), data, u.opts)
 		var apiErr *api.Error
-		if err == nil || !errors.As(err, &apiErr) || apiErr.Code != tooManyUploads {
+		if err == nil || !errors.As(err, &apiErr) || apiErr.Code != api.CodeTooManyUploads {
 			return counts, err
 		}
 		if attempt == MaxRetries {
@@ -253,52 +225,30 @@ func send(cmd *cobra.Command, f *cmdutil.Factory, u upload, data []byte) (Counts
 	}
 }
 
-// Params are the projects/upload parameters (besides the file and token).
-func Params(item transfer.Item, updating string, source bool) url.Values {
-	params := url.Values{
-		"id":       {strconv.Itoa(item.Project.ID)},
-		"updating": {updating},
-		"language": {item.Language},
+// uploadOptions maps a file's `push:` block onto projects/upload. The
+// source file creates terms (terms_translations, or push.updating); every
+// other language only brings translations. sync_terms applies to the source
+// upload only.
+func uploadOptions(item transfer.Item, source bool) api.UploadOptions {
+	opts := api.UploadOptions{Updating: "translations", Language: item.Language}
+	if source {
+		opts.Updating = "terms_translations"
 	}
 	push := item.File.Push
 	if push == nil {
-		return params
+		return opts
 	}
-	if push.Overwrite {
-		params.Set("overwrite", "1")
+	if source && push.Updating != "" {
+		opts.Updating = push.Updating
 	}
-	if push.SyncTerms && source {
-		params.Set("sync_terms", "1")
+	opts.Overwrite = push.Overwrite
+	opts.SyncTerms = push.SyncTerms && source
+	opts.ReadFromSource = push.ReadFromSource
+	opts.FuzzyTrigger = push.FuzzyTrigger
+	if t := push.Tags; t != nil {
+		opts.Tags = api.UploadTags{All: t.All, New: t.New, Obsolete: t.Obsolete, OverwrittenTranslations: t.OverwrittenTranslations}
 	}
-	if push.ReadFromSource {
-		params.Set("read_from_source", "1")
-	}
-	if push.FuzzyTrigger {
-		params.Set("fuzzy_trigger", "1")
-	}
-	if tags := tagsJSON(push.Tags); tags != "" {
-		params.Set("tags", tags)
-	}
-	return params
-}
-
-func tagsJSON(t *repoconfig.PushTags) string {
-	if t == nil {
-		return ""
-	}
-	var parts []string
-	for _, group := range []struct {
-		key  string
-		tags []string
-	}{{"all", t.All}, {"new", t.New}, {"obsolete", t.Obsolete}, {"overwritten_translations", t.OverwrittenTranslations}} {
-		if len(group.tags) > 0 {
-			parts = append(parts, strconv.Quote(group.key)+":"+transfer.JSONList(group.tags))
-		}
-	}
-	if len(parts) == 0 {
-		return ""
-	}
-	return "{" + strings.Join(parts, ",") + "}"
+	return opts
 }
 
 func wait(cmd *cobra.Command, f *cmdutil.Factory, d time.Duration, why string) error {
@@ -308,22 +258,21 @@ func wait(cmd *cobra.Command, f *cmdutil.Factory, d time.Duration, why string) e
 
 // describe is the --dry-run detail of an upload.
 func describe(u upload) string {
-	parts := []string{"updating=" + u.updating}
-	if p := u.File.Push; p != nil {
-		if p.Overwrite {
-			parts = append(parts, "overwrite")
-		}
-		if p.SyncTerms && u.source {
-			parts = append(parts, "sync_terms")
-		}
-		if tags := tagsJSON(p.Tags); tags != "" {
-			parts = append(parts, "tags="+tags)
-		}
+	parts := []string{"updating=" + u.opts.Updating}
+	if u.opts.Overwrite {
+		parts = append(parts, "overwrite")
+	}
+	if u.opts.SyncTerms {
+		parts = append(parts, "sync_terms")
+	}
+	if tags := u.opts.Tags.String(); tags != "" {
+		parts = append(parts, "tags="+tags)
 	}
 	return strings.Join(parts, ", ")
 }
 
-func (c Counts) String() string {
+// describeCounts is the stderr detail of a finished upload.
+func describeCounts(c api.UploadResult) string {
 	var parts []string
 	if t := c.Terms; t != nil {
 		parts = append(parts, fmt.Sprintf("terms: %d parsed, %d added, %d deleted", t.Parsed, t.Added, t.Deleted))

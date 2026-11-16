@@ -7,17 +7,9 @@ import (
 
 	"github.com/spf13/cobra"
 
+	"github.com/POEditor/poeditor-cli/internal/api"
 	"github.com/POEditor/poeditor-cli/internal/cmdutil"
 )
-
-// Project is one entry of the projects/list result.
-type Project struct {
-	ID      int    `json:"id"`
-	Name    string `json:"name"`
-	Public  int    `json:"public"`
-	Open    int    `json:"open"`
-	Created string `json:"created"`
-}
 
 // NewCmdList returns `poeditor projects list` (API v2 projects/list).
 func NewCmdList(f *cmdutil.Factory) *cobra.Command {
@@ -34,14 +26,12 @@ func NewCmdList(f *cmdutil.Factory) *cobra.Command {
 			}
 			client := f.APIClientWithToken(account.Token)
 
-			var result struct {
-				Projects []Project `json:"projects"`
-			}
-			if err := client.Post(cmd.Context(), "projects/list", nil, &result); err != nil {
+			projects, err := client.ProjectsList(cmd.Context())
+			if err != nil {
 				return err
 			}
 
-			if err := printProjects(f, result.Projects, asJSON); err != nil {
+			if err := printProjects(f, projects, asJSON); err != nil {
 				return err
 			}
 			return accountHint(f, account.Name)
@@ -52,10 +42,10 @@ func NewCmdList(f *cmdutil.Factory) *cobra.Command {
 	return cmd
 }
 
-func printProjects(f *cmdutil.Factory, projects []Project, asJSON bool) error {
+func printProjects(f *cmdutil.Factory, projects []api.Project, asJSON bool) error {
 	if asJSON {
 		if projects == nil {
-			projects = []Project{}
+			projects = []api.Project{}
 		}
 		return cmdutil.PrintJSON(f.IO, projects)
 	}

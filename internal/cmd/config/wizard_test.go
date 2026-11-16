@@ -22,6 +22,12 @@ type remoteAccount struct {
 	langs    map[int][]string // id → language codes
 }
 
+// formID is the request's project id as the API echoes it back: an int.
+func formID(form url.Values) int {
+	id, _ := strconv.Atoi(form.Get("id"))
+	return id
+}
+
 func fakeWizardAPI(t *testing.T, byToken map[string]remoteAccount) *testutil.FakeAPI {
 	t.Helper()
 	fake := testutil.NewFakeAPI(t)
@@ -33,7 +39,7 @@ func fakeWizardAPI(t *testing.T, byToken map[string]remoteAccount) *testutil.Fak
 		return testutil.OK(map[string]any{"projects": list})
 	})
 	fake.StubFunc("projects/view", func(form url.Values) testutil.Stub {
-		return testutil.OK(map[string]any{"project": map[string]any{"id": form.Get("id"), "reference_language": "en"}})
+		return testutil.OK(map[string]any{"project": map[string]any{"id": formID(form), "reference_language": "en"}})
 	})
 	fake.StubFunc("languages/list", func(form url.Values) testutil.Stub {
 		acc := byToken[form.Get("api_token")]

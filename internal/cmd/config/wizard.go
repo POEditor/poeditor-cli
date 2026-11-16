@@ -3,7 +3,6 @@ package config
 import (
 	"errors"
 	"fmt"
-	"net/url"
 	"regexp"
 	"slices"
 	"sort"
@@ -96,29 +95,22 @@ func (w *wizard) chooseAccount() (chosenAccount, error) {
 	return chosenAccount{resolved: res, write: names[i]}, err
 }
 
-type remoteProject struct {
-	ID   int    `json:"id"`
-	Name string `json:"name"`
-}
-
-func (w *wizard) chooseProject(client *api.Client, exclude map[int]bool) (remoteProject, error) {
-	var result struct {
-		Projects []remoteProject `json:"projects"`
+func (w *wizard) chooseProject(client *api.Client, exclude map[int]bool) (api.Project, error) {
+	projects, err := client.ProjectsList(w.cmd.Context())
+	if err != nil {
+		return api.Project{}, err
 	}
-	if err := client.Post(w.cmd.Context(), "projects/list", nil, &result); err != nil {
-		return remoteProject{}, err
-	}
-	var choices []remoteProject
-	for _, p := range result.Projects {
+	var choices []api.Project
+	for _, p := range projects {
 		if !exclude[p.ID] {
 			choices = append(choices, p)
 		}
 	}
 	if len(choices) == 0 {
-		if len(result.Projects) > 0 {
-			return remoteProject{}, errors.New("every project of this account is already in " + repoconfig.FileName)
+		if len(projects) > 0 {
+			return api.Project{}, errors.New("every project of this account is already in " + repoconfig.FileName)
 		}
-		return remoteProject{}, errors.New("this account has no projects: create one on poeditor.com first")
+		return api.Project{}, errors.New("this account has no projects: create one on poeditor.com first")
 	}
 	sort.Slice(choices, func(i, j int) bool { return strings.ToLower(choices[i].Name) < strings.ToLower(choices[j].Name) })
 	labels := make([]string, len(choices))
@@ -127,7 +119,7 @@ func (w *wizard) chooseProject(client *api.Client, exclude map[int]bool) (remote
 	}
 	i, err := w.ask.Select("Which project?", labels, 0)
 	if err != nil {
-		return remoteProject{}, err
+		return api.Project{}, err
 	}
 	return choices[i], nil
 }
@@ -135,29 +127,15 @@ func (w *wizard) chooseProject(client *api.Client, exclude map[int]bool) (remote
 // projectLanguages returns the project's language codes and its default
 // (reference) language, if set.
 func (w *wizard) projectLanguages(client *api.Client, id int) ([]string, string, error) {
-	params := url.Values{"id": {strconv.Itoa(id)}}
-	var view struct {
-		Project struct {
-			ReferenceLanguage string `json:"reference_language"`
-		} `json:"project"`
-	}
-	if err := client.Post(w.cmd.Context(), "projects/view", params, &view); err != nil {
+	view, err := client.ProjectsView(w.cmd.Context(), id)
+	if err != nil {
 		return nil, "", err
 	}
-	var langs struct {
-		Languages []struct {
-			Code string `json:"code"`
-		} `json:"languages"`
-	}
-	if err := client.Post(w.cmd.Context(), "languages/list", params, &langs); err != nil {
+	codes, err := client.LanguageCodes(w.cmd.Context(), id)
+	if err != nil {
 		return nil, "", err
 	}
-	codes := make([]string, 0, len(langs.Languages))
-	for _, l := range langs.Languages {
-		codes = append(codes, l.Code)
-	}
-	sort.Strings(codes)
-	return codes, view.Project.ReferenceLanguage, nil
+	return codes, view.ReferenceLanguage, nil
 }
 
 var nonSlug = regexp.MustCompile(`[^a-z0-9]+`)

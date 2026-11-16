@@ -30,7 +30,7 @@ func TestPost_sendsFormWithToken(t *testing.T) {
 		io.WriteString(w, `{"response":{"status":"success","code":"200","message":"OK"}}`)
 	})
 
-	err := client.Post(context.Background(), "terms/list", url.Values{"id": {"7717"}}, nil)
+	err := client.PostForTest(context.Background(), "terms/list", url.Values{"id": {"7717"}}, nil)
 
 	if err != nil {
 		t.Fatal(err)
@@ -55,7 +55,7 @@ func TestPost_decodesResult(t *testing.T) {
 	})
 	var result struct{ N int }
 
-	if err := client.Post(context.Background(), "x", nil, &result); err != nil {
+	if err := client.PostForTest(context.Background(), "x", nil, &result); err != nil {
 		t.Fatal(err)
 	}
 	if result.N != 3 {
@@ -68,7 +68,7 @@ func TestPost_failResponseIsAPIError(t *testing.T) {
 		io.WriteString(w, `{"response":{"status":"fail","code":"4011","message":"Invalid API Token"}}`)
 	})
 
-	err := client.Post(context.Background(), "x", nil, nil)
+	err := client.PostForTest(context.Background(), "x", nil, nil)
 
 	var apiErr *api.Error
 	if !errors.As(err, &apiErr) || apiErr.Code != "4011" || apiErr.Message != "Invalid API Token" {
@@ -82,7 +82,7 @@ func TestPost_nonJSONResponse(t *testing.T) {
 		io.WriteString(w, "<html>502 Bad Gateway</html>")
 	})
 
-	err := client.Post(context.Background(), "x", nil, nil)
+	err := client.PostForTest(context.Background(), "x", nil, nil)
 
 	if err == nil || !strings.Contains(err.Error(), "HTTP 502") || !strings.Contains(err.Error(), "Bad Gateway") {
 		t.Fatalf("got %v", err)
@@ -143,7 +143,7 @@ func TestUpload_multipart(t *testing.T) {
 		Terms struct{ Added int } `json:"terms"`
 	}
 
-	err := client.Upload(context.Background(), "projects/upload", url.Values{"id": {"7"}, "updating": {"terms"}}, "en.json", []byte(`{"a":"b"}`), &result)
+	err := client.UploadForTest(context.Background(), "projects/upload", url.Values{"id": {"7"}, "updating": {"terms"}}, "en.json", []byte(`{"a":"b"}`), &result)
 
 	if err != nil {
 		t.Fatal(err)

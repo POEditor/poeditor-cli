@@ -2,9 +2,7 @@ package config
 
 import (
 	"fmt"
-	"net/url"
 	"sort"
-	"strconv"
 	"strings"
 
 	"github.com/spf13/cobra"
@@ -128,34 +126,23 @@ func checkProject(cmd *cobra.Command, f *cmdutil.Factory, p repoconfig.Project) 
 		rep.Account = "POEDITOR_TOKEN"
 	}
 	client := f.APIClientWithToken(account.Token)
-	params := url.Values{"id": {strconv.Itoa(p.ID)}}
-
-	var view struct {
-		Project struct {
-			Name string `json:"name"`
-		} `json:"project"`
-	}
-	if err := client.Post(cmd.Context(), "projects/view", params, &view); err != nil {
+	view, err := client.ProjectsView(cmd.Context(), p.ID)
+	if err != nil {
 		fail(repoconfig.Error, fmt.Sprintf("cannot open project %d as %s: %v", p.ID, rep.Account, err))
 		return rep
 	}
-	rep.Project.Name = view.Project.Name
+	rep.Project.Name = view.Name
 
-	var langs struct {
-		Languages []struct {
-			Code string `json:"code"`
-		} `json:"languages"`
-	}
-	if err := client.Post(cmd.Context(), "languages/list", params, &langs); err != nil {
+	codes, err := client.LanguageCodes(cmd.Context(), p.ID)
+	if err != nil {
 		fail(repoconfig.Error, fmt.Sprintf("cannot list the languages of project %d: %v", p.ID, err))
 		return rep
 	}
+	rep.Languages = codes
 	have := map[string]bool{}
-	for _, l := range langs.Languages {
-		have[l.Code] = true
-		rep.Languages = append(rep.Languages, l.Code)
+	for _, code := range codes {
+		have[code] = true
 	}
-	sort.Strings(rep.Languages)
 
 	missing := func(code, field string, sev repoconfig.Severity) {
 		if code != "" && !have[code] {

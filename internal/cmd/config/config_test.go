@@ -148,7 +148,7 @@ func fakeProjects(t *testing.T, projects map[string][]string) *testutil.FakeAPI 
 		if _, ok := projects[form.Get("id")]; !ok {
 			return testutil.Fail("403", "You don't have permission to access this resource")
 		}
-		return testutil.OK(map[string]any{"project": map[string]any{"id": form.Get("id"), "name": "Project " + form.Get("id")}})
+		return testutil.OK(map[string]any{"project": map[string]any{"id": formID(form), "name": "Project " + form.Get("id")}})
 	})
 	fake.StubFunc("languages/list", func(form url.Values) testutil.Stub {
 		var langs []map[string]any

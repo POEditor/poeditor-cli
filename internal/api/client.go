@@ -2,6 +2,13 @@
 // <base>/<endpoint> with an api_token field; every response is wrapped in
 //
 //	{"response": {"status": "success|fail", "code": "200", "message": "OK"}, "result": {...}}
+//
+// Layout: client.go is the transport (post, upload, Download, *Error); each
+// API group has its own file (projects.go, languages.go…) with one exported
+// method per endpoint, named after it (projects/list → ProjectsList), plus its
+// result types and an options struct when the endpoint has optional
+// parameters. The transport is unexported, so commands can only call the API
+// through those methods.
 package api
 
 import (
@@ -60,9 +67,9 @@ type envelope struct {
 	Result json.RawMessage `json:"result"`
 }
 
-// Post calls endpoint (e.g. "projects/list") with params and decodes the
+// post calls endpoint (e.g. "projects/list") with params and decodes the
 // "result" object into result (which may be nil).
-func (c *Client) Post(ctx context.Context, endpoint string, params url.Values, result any) error {
+func (c *Client) post(ctx context.Context, endpoint string, params url.Values, result any) error {
 	form := url.Values{}
 	for key, values := range params {
 		form[key] = values
@@ -71,9 +78,9 @@ func (c *Client) Post(ctx context.Context, endpoint string, params url.Values, r
 	return c.do(ctx, endpoint, "application/x-www-form-urlencoded", strings.NewReader(form.Encode()), result)
 }
 
-// Upload calls endpoint as multipart/form-data with params plus one file in
+// upload calls endpoint as multipart/form-data with params plus one file in
 // the form field "file" (projects/upload).
-func (c *Client) Upload(ctx context.Context, endpoint string, params url.Values, fileName string, data []byte, result any) error {
+func (c *Client) upload(ctx context.Context, endpoint string, params url.Values, fileName string, data []byte, result any) error {
 	var body bytes.Buffer
 	mw := multipart.NewWriter(&body)
 	for key, values := range params {

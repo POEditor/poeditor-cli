@@ -62,10 +62,8 @@ Tokens are created at ` + TokenPageURL + `.`,
 				return err
 			}
 
-			var result struct {
-				Projects []struct{} `json:"projects"`
-			}
-			if err := f.APIClientWithToken(token).Post(cmd.Context(), "projects/list", nil, &result); err != nil {
+			projects, err := f.APIClientWithToken(token).ProjectsList(cmd.Context())
+			if err != nil {
 				return fmt.Errorf("token not accepted, nothing was saved: %w", err)
 			}
 
@@ -91,7 +89,7 @@ Tokens are created at ` + TokenPageURL + `.`,
 			if existed {
 				verb = "Updated the token of"
 			}
-			fmt.Fprintf(f.IO.ErrOut, "%s account %q (%s).\n", verb, name, projectCount(len(result.Projects)))
+			fmt.Fprintf(f.IO.ErrOut, "%s account %q (%s).\n", verb, name, projectCount(len(projects)))
 			if keyringErr != nil {
 				fmt.Fprintf(f.IO.ErrOut, "Warning: no system keyring available (%v); the token is stored in plain text in %s.\n", keyringErr, cfg.Path())
 			} else {

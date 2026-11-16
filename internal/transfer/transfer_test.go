@@ -54,12 +54,6 @@ func TestItems(t *testing.T) {
 	}
 }
 
-func TestJSONList(t *testing.T) {
-	if got := transfer.JSONList([]string{"a", `b"c`}); got != `["a","b\"c"]` {
-		t.Errorf("got %s", got)
-	}
-}
-
 func TestWriteFile(t *testing.T) {
 	dir := t.TempDir()
 	path := filepath.Join(dir, "deep", "fr.json")

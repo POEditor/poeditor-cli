@@ -4,14 +4,10 @@
 package transfer
 
 import (
-	"context"
 	"errors"
 	"fmt"
-	"net/url"
 	"path/filepath"
 	"slices"
-	"sort"
-	"strconv"
 	"strings"
 
 	"github.com/POEditor/poeditor-cli/internal/api"
@@ -72,24 +68,6 @@ func Client(f *cmdutil.Factory, p repoconfig.Project) (*api.Client, error) {
 	return f.APIClientWithToken(account.Token), nil
 }
 
-// ProjectLanguages lists the project's language codes, sorted.
-func ProjectLanguages(ctx context.Context, client *api.Client, projectID int) ([]string, error) {
-	var result struct {
-		Languages []struct {
-			Code string `json:"code"`
-		} `json:"languages"`
-	}
-	if err := client.Post(ctx, "languages/list", url.Values{"id": {strconv.Itoa(projectID)}}, &result); err != nil {
-		return nil, err
-	}
-	codes := make([]string, 0, len(result.Languages))
-	for _, l := range result.Languages {
-		codes = append(codes, l.Code)
-	}
-	sort.Strings(codes)
-	return codes, nil
-}
-
 // Items expands the files of a project into one Item per language: the
 // file's `languages:` if set, else every project language, narrowed to
 // only (the --language flags) when given.
@@ -118,15 +96,6 @@ func Items(cfg *repoconfig.Config, p repoconfig.Project, projectLangs, only []st
 		}
 	}
 	return items, nil
-}
-
-// JSONList encodes a list for an API parameter (filters, tags).
-func JSONList(values []string) string {
-	quoted := make([]string, len(values))
-	for i, v := range values {
-		quoted[i] = strconv.Quote(v)
-	}
-	return "[" + strings.Join(quoted, ",") + "]"
 }
 
 // ErrStopped wraps the first failure of a pull or push.

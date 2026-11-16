@@ -4,8 +4,6 @@ package pull
 
 import (
 	"fmt"
-	"net/url"
-	"strconv"
 	"strings"
 
 	"github.com/spf13/cobra"
@@ -67,7 +65,7 @@ written before it stay written.`,
 					if err != nil {
 						return err
 					}
-					langs, err := transfer.ProjectLanguages(cmd.Context(), client, p.ID)
+					langs, err := client.LanguageCodes(cmd.Context(), p.ID)
 					if err != nil {
 						return fmt.Errorf("project %s: %w", p.Label(), err)
 					}
@@ -112,48 +110,28 @@ written before it stay written.`,
 
 // pullOne exports one file in one language and writes it.
 func pullOne(cmd *cobra.Command, client *api.Client, item transfer.Item, dryRun bool) (string, error) {
-	params := ExportParams(item)
-	var result struct {
-		URL string `json:"url"`
-	}
-	if err := client.Post(cmd.Context(), "projects/export", params, &result); err != nil {
+	link, err := client.ProjectsExport(cmd.Context(), item.Project.ID, exportOptions(item))
+	if err != nil {
 		return "", err
 	}
-	if result.URL == "" {
-		return "", fmt.Errorf("the API returned no download link")
-	}
-	data, err := client.Download(cmd.Context(), result.URL)
+	data, err := client.Download(cmd.Context(), link)
 	if err != nil {
 		return "", err
 	}
 	return transfer.WriteFile(item.Path, data, dryRun)
 }
 
-// ExportParams are the projects/export parameters for one item.
-func ExportParams(item transfer.Item) url.Values {
-	params := url.Values{
-		"id":       {strconv.Itoa(item.Project.ID)},
-		"language": {item.Language},
-		"type":     {item.File.Format},
-	}
+// exportOptions maps a file's `pull:` block onto projects/export.
+func exportOptions(item transfer.Item) api.ExportOptions {
+	opts := api.ExportOptions{Language: item.Language, Type: item.File.Format}
 	if p := item.File.Pull; p != nil {
-		if len(p.Filters) > 0 {
-			params.Set("filters", transfer.JSONList(p.Filters))
-		}
-		if len(p.Tags) > 0 {
-			params.Set("tags", transfer.JSONList(p.Tags))
-			if p.TagsMatch != "" {
-				params.Set("tags_match", p.TagsMatch)
-			}
-		}
-		if p.Order != "" {
-			params.Set("order", p.Order)
-		}
-		if p.FallbackLanguage != "" {
-			params.Set("fallback_language", p.FallbackLanguage)
-		}
+		opts.Filters = p.Filters
+		opts.Tags = p.Tags
+		opts.TagsMatch = p.TagsMatch
+		opts.Order = p.Order
+		opts.FallbackLanguage = p.FallbackLanguage
 	}
-	return params
+	return opts
 }
 
 func summary(results []Result, dryRun bool) string {
