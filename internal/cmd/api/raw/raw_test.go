@@ -20,8 +20,70 @@ import (
 
 func TestMain(m *testing.M) { testutil.Main(m) }
 
+// rawCmd is an endpoint that still has a raw command.
+type rawCmd struct {
+	endpoint string   // group/action, as the API names it
+	path     []string // "api", group, command
+}
+
+// args is the command line: the command, then extra.
+func (c rawCmd) args(extra ...string) []string {
+	return append(append([]string{}, c.path...), extra...)
+}
+
+// stillRaw returns the endpoints that still have a raw command, in
+// raw.Endpoints order. The tests here take their endpoints from it instead of
+// naming them, so building a dedicated command never breaks them; once every
+// endpoint has one, they skip.
+func stillRaw(t testing.TB) []rawCmd {
+	t.Helper()
+	commands := map[string]*cobra.Command{}
+	for _, cmd := range testutil.Leaves() {
+		commands[cmd.CommandPath()] = cmd
+	}
+	var out []rawCmd
+	for _, endpoint := range raw.Endpoints {
+		group, action, _ := strings.Cut(endpoint, "/")
+		path := []string{"api", group, raw.CommandName(action)}
+		if cmd := commands["poeditor "+strings.Join(path, " ")]; cmd != nil && isRaw(cmd) {
+			out = append(out, rawCmd{endpoint: endpoint, path: path})
+		}
+	}
+	if len(out) == 0 {
+		t.Skip("every endpoint has a dedicated command")
+	}
+	return out
+}
+
+// someRaw returns the first still-raw endpoint that deletes data (deleting)
+// or does not.
+func someRaw(t testing.TB, deleting bool) rawCmd {
+	t.Helper()
+	for _, c := range stillRaw(t) {
+		if isDeleting(c) == deleting {
+			return c
+		}
+	}
+	t.Skipf("no raw command left with deleting = %v", deleting)
+	return rawCmd{}
+}
+
+func isRaw(cmd *cobra.Command) bool {
+	return strings.HasSuffix(testutil.CommandPackage(cmd), "/internal/cmd/api/raw")
+}
+
+// isDeleting reports a raw command behind --yes.
+func isDeleting(c rawCmd) bool {
+	for _, cmd := range testutil.Leaves() {
+		if cmd.CommandPath() == "poeditor "+strings.Join(c.path, " ") {
+			return cmd.Flags().Lookup("yes") != nil
+		}
+	}
+	return false
+}
+
 // The fixtures' shapes need not match their endpoints: a raw command prints
-// whatever comes back. Raw results keep the key order the API sends, which the table must follow.
+// whatever comes back, so the tests take any still-raw endpoint (someRaw). Raw results keep the key order the API sends, which the table must follow.
 const (
 	projectsResult = `{"projects":[` +
 		`{"id":7717,"name":"Mobile app","public":0,"created":"2026-01-14T09:12:44+0000"},` +
@@ -44,45 +106,46 @@ const (
 
 func TestAPI_output(t *testing.T) {
 	tests := []struct {
-		name   string
-		args   []string
-		result string // "" = the endpoint returns no result
-		tty    bool
+		name     string
+		args     []string // after the command
+		deleting bool     // a command behind --yes
+		result   string   // "" = the endpoint returns no result
+		tty      bool
 	}{
-		{"list", []string{"api", "contributors", "list"}, projectsResult, true},
-		{"list_piped", []string{"api", "contributors", "list"}, projectsResult, false},
-		{"terms", []string{"api", "contributors", "list", "--id", "7717"}, termsResult, true},
-		{"terms_piped", []string{"api", "contributors", "list", "--id", "7717"}, termsResult, false},
-		{"list_empty", []string{"api", "contributors", "list"}, emptyResult, true},
-		{"list_empty_piped", []string{"api", "contributors", "list"}, emptyResult, false},
-		{"object", []string{"api", "projects", "view", "-f", "id=7717"}, projectResult, true},
-		{"object_piped", []string{"api", "projects", "view", "-f", "id=7717"}, projectResult, false},
-		{"stats", []string{"api", "terms", "add", "-f", "id=7717"}, statsResult, true},
-		{"values", []string{"api", "contributors", "add"}, codesResult, true},
-		{"scalar", []string{"api", "projects", "export", "-f", "id=7717"}, urlResult, true},
-		{"json", []string{"api", "projects", "view", "-f", "id=7717", "--json"}, projectResult, true},
-		{"envelope", []string{"api", "projects", "view", "-f", "id=7717", "--envelope"}, projectResult, true},
-		{"no_result", []string{"api", "projects", "delete", "-f", "id=7717", "--yes"}, "", true},
+		{"list", nil, false, projectsResult, true},
+		{"list_piped", nil, false, projectsResult, false},
+		{"terms", []string{"--id", "7717"}, false, termsResult, true},
+		{"terms_piped", []string{"--id", "7717"}, false, termsResult, false},
+		{"list_empty", nil, false, emptyResult, true},
+		{"list_empty_piped", nil, false, emptyResult, false},
+		{"object", []string{"-f", "id=7717"}, false, projectResult, true},
+		{"object_piped", []string{"-f", "id=7717"}, false, projectResult, false},
+		{"stats", []string{"-f", "id=7717"}, false, statsResult, true},
+		{"values", nil, false, codesResult, true},
+		{"scalar", []string{"-f", "id=7717"}, false, urlResult, true},
+		{"json", []string{"-f", "id=7717", "--json"}, false, projectResult, true},
+		{"envelope", []string{"-f", "id=7717", "--envelope"}, false, projectResult, true},
+		{"no_result", []string{"-f", "id=7717", "--yes"}, true, "", true},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
+			c := someRaw(t, tt.deleting)
 			fake := testutil.NewFakeAPI(t)
-			endpoint := tt.args[1] + "/" + tt.args[2]
 			var result any
 			if tt.result != "" {
 				result = json.RawMessage(tt.result)
 			}
-			fake.Stub(endpoint, testutil.OK(result))
+			fake.Stub(c.endpoint, testutil.OK(result))
 			env := testutil.NewEnv(t, fake).Login("default", testutil.TestToken)
 			env.TTY = tt.tty
 
-			res := env.Run(tt.args...)
+			res := env.Run(c.args(tt.args...)...)
 
 			if res.Err != nil {
 				t.Fatal(res.Err)
 			}
 			req := fake.OnlyRequest(t)
-			if req.Endpoint != endpoint || req.Form.Get("api_token") != testutil.TestToken {
+			if req.Endpoint != c.endpoint || req.Form.Get("api_token") != testutil.TestToken {
 				t.Errorf("request = %s %v", req.Endpoint, req.Form)
 			}
 			if res.Stderr != "" {
@@ -94,12 +157,13 @@ func TestAPI_output(t *testing.T) {
 }
 
 func TestAPI_output_narrowTerminal(t *testing.T) {
+	c := someRaw(t, false)
 	fake := testutil.NewFakeAPI(t)
-	fake.Stub("contributors/list", testutil.OK(json.RawMessage(projectsResult)))
+	fake.Stub(c.endpoint, testutil.OK(json.RawMessage(projectsResult)))
 	env := testutil.NewEnv(t, fake).Login("default", testutil.TestToken)
 	env.Width = 60
 
-	res := env.Run("api", "contributors", "list")
+	res := env.Run(c.args()...)
 
 	if res.Err != nil {
 		t.Fatal(res.Err)
@@ -113,8 +177,9 @@ func TestAPI_output_narrowTerminal(t *testing.T) {
 }
 
 func TestAPI_fields(t *testing.T) {
+	c := someRaw(t, false)
 	fake := testutil.NewFakeAPI(t)
-	fake.Stub("terms/add", testutil.OK(map[string]any{"terms": map[string]int{"parsed": 1, "added": 1}}))
+	fake.Stub(c.endpoint, testutil.OK(map[string]any{"terms": map[string]int{"parsed": 1, "added": 1}}))
 	env := testutil.NewEnv(t, fake).Login("default", testutil.TestToken)
 	terms := `[{"term":"Hello","context":""}]`
 	if err := os.WriteFile(filepath.Join(env.WorkDir, "terms.json"), []byte(terms), 0o644); err != nil {
@@ -122,14 +187,14 @@ func TestAPI_fields(t *testing.T) {
 	}
 	env.Stdin = "from stdin"
 
-	res := env.Run("api", "terms", "add", "-f", "id=7717", "-f", "tags=a", "--field", "tags=b=c", "-F", "data=terms.json", "--field-file", "note=-")
+	res := env.Run(c.args("-f", "id=7717", "-f", "tags=a", "--field", "tags=b=c", "-F", "data=terms.json", "--field-file", "note=-")...)
 
 	if res.Err != nil {
 		t.Fatal(res.Err)
 	}
 	req := fake.OnlyRequest(t)
 	want := url.Values{"api_token": {testutil.TestToken}, "id": {"7717"}, "tags": {"a", "b=c"}, "data": {terms}, "note": {"from stdin"}}
-	if req.Endpoint != "terms/add" || !reflect.DeepEqual(req.Form, want) {
+	if req.Endpoint != c.endpoint || !reflect.DeepEqual(req.Form, want) {
 		t.Errorf("request = %s %v\nwant %v", req.Endpoint, req.Form, want)
 	}
 }
@@ -150,7 +215,7 @@ func TestAPI_everyEndpoint(t *testing.T) {
 			t.Errorf("%s: no command `poeditor %s`", endpoint, strings.Join(args, " "))
 			continue
 		}
-		if !strings.HasSuffix(testutil.CommandPackage(cmd), "/internal/cmd/api/raw") {
+		if !isRaw(cmd) {
 			continue // a dedicated command, tested in its own package
 		}
 		t.Run(endpoint, func(t *testing.T) {
@@ -188,24 +253,21 @@ func TestAPI_everyEndpoint(t *testing.T) {
 // Raw commands that delete data send nothing without --yes, and say how to
 // send it; with --yes the request goes out (yes itself is not a parameter).
 func TestAPI_deletesNeedYes(t *testing.T) {
-	// the deleting endpoints that still have a raw command (a dedicated one tests its own --yes)
-	deleting := map[string][]string{
-		"projects/delete":     {"api", "projects", "delete"},
-		"projects/sync":       {"api", "projects", "sync"},
-		"terms/delete":        {"api", "terms", "delete"},
-		"translations/delete": {"api", "translations", "delete"},
-		"contributors/remove": {"api", "contributors", "remove"},
-	}
-	for endpoint, args := range deleting {
-		t.Run(endpoint, func(t *testing.T) {
+	ran := 0
+	for _, c := range stillRaw(t) {
+		if !isDeleting(c) {
+			continue
+		}
+		ran++
+		t.Run(c.endpoint, func(t *testing.T) {
 			fake := testutil.NewFakeAPI(t)
-			fake.Stub(endpoint, testutil.OK(nil))
+			fake.Stub(c.endpoint, testutil.OK(nil))
 			params := []string{"--id", "7717", "--data", `[{"term":"it's"}]`}
 
-			res := testutil.Run(t, fake, append(args, params...)...)
+			res := testutil.Run(t, fake, c.args(params...)...)
 
-			want := endpoint + " deletes data and cannot be undone; nothing was sent. To send it, run:\n" +
-				"  poeditor " + strings.Join(args, " ") + ` --id 7717 --data '[{"term":"it'\''s"}]' --yes`
+			want := c.endpoint + " deletes data and cannot be undone; nothing was sent. To send it, run:\n" +
+				"  poeditor " + strings.Join(c.path, " ") + ` --id 7717 --data '[{"term":"it'\''s"}]' --yes`
 			if res.Err == nil || res.Err.Error() != want {
 				t.Errorf("err = %v\nwant  %s", res.Err, want)
 			}
@@ -213,7 +275,7 @@ func TestAPI_deletesNeedYes(t *testing.T) {
 				t.Fatalf("%d requests sent without --yes", n)
 			}
 
-			res = testutil.Run(t, fake, append(args, append(params, "--yes")...)...)
+			res = testutil.Run(t, fake, c.args(append(params, "--yes")...)...)
 
 			if res.Err != nil {
 				t.Fatal(res.Err)
@@ -225,9 +287,12 @@ func TestAPI_deletesNeedYes(t *testing.T) {
 		})
 	}
 	// the others have no --yes: it would be an API parameter
-	res := testutil.Run(t, nil, "api", "projects", "view", "--help")
+	res := testutil.Run(t, nil, someRaw(t, false).args("--help")...)
 	if strings.Contains(res.Stdout, "--yes") {
-		t.Error("projects view offers --yes")
+		t.Error("a non-deleting raw command offers --yes")
+	}
+	if ran == 0 {
+		t.Skip("no deleting raw command left")
 	}
 }
 
@@ -250,10 +315,11 @@ func TestAPI_parameterFlags(t *testing.T) {
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
+			c := someRaw(t, false)
 			fake := testutil.NewFakeAPI(t)
-			fake.Stub("projects/update", testutil.OK(nil))
+			fake.Stub(c.endpoint, testutil.OK(nil))
 
-			res := testutil.Run(t, fake, append([]string{"api", "projects", "update"}, tt.args...)...)
+			res := testutil.Run(t, fake, c.args(tt.args...)...)
 
 			if res.Err != nil {
 				t.Fatal(res.Err)
@@ -268,17 +334,18 @@ func TestAPI_parameterFlags(t *testing.T) {
 }
 
 func TestAPI_argumentPlacement(t *testing.T) {
+	c := someRaw(t, false)
 	tests := []struct {
 		name string
 		args []string
 	}{
-		{"global flag before the endpoint", []string{"api", "--account", "client-a", "projects", "view", "--id", "7"}},
-		{"global flag after the parameters", []string{"api", "projects", "view", "--id", "7", "--account=client-a"}},
+		{"global flag before the endpoint", append([]string{"api", "--account", "client-a"}, c.args("--id", "7")[1:]...)},
+		{"global flag after the parameters", c.args("--id", "7", "--account=client-a")},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			fake := testutil.NewFakeAPI(t)
-			fake.Stub("projects/view", testutil.OK(nil))
+			fake.Stub(c.endpoint, testutil.OK(nil))
 			env := testutil.NewEnv(t, fake).Login("personal", "tok-personal").Login("client-a", "tok-client")
 
 			res := env.Run(tt.args...)
@@ -287,7 +354,7 @@ func TestAPI_argumentPlacement(t *testing.T) {
 				t.Fatal(res.Err)
 			}
 			req := fake.OnlyRequest(t)
-			if req.Endpoint != "projects/view" || req.Form.Get("id") != "7" || req.Form.Get("api_token") != "tok-client" {
+			if req.Endpoint != c.endpoint || req.Form.Get("id") != "7" || req.Form.Get("api_token") != "tok-client" {
 				t.Errorf("request = %s %v", req.Endpoint, req.Form)
 			}
 		})
@@ -295,7 +362,8 @@ func TestAPI_argumentPlacement(t *testing.T) {
 }
 
 func TestAPI_help(t *testing.T) {
-	for _, args := range [][]string{{"api", "projects", "view", "--help"}, {"api", "projects", "view", "-h"}} {
+	c := someRaw(t, false)
+	for _, args := range [][]string{c.args("--help"), c.args("-h")} {
 		fake := testutil.NewFakeAPI(t)
 
 		res := testutil.Run(t, fake, args...)
@@ -310,8 +378,9 @@ func TestAPI_help(t *testing.T) {
 }
 
 func TestAPI_upload(t *testing.T) {
+	c := someRaw(t, false)
 	fake := testutil.NewFakeAPI(t)
-	fake.Stub("projects/upload", testutil.OK(map[string]any{"terms": map[string]int{"parsed": 1}}))
+	fake.Stub(c.endpoint, testutil.OK(map[string]any{"terms": map[string]int{"parsed": 1}}))
 	env := testutil.NewEnv(t, fake).Login("default", testutil.TestToken)
 	if err := os.MkdirAll(filepath.Join(env.WorkDir, "locales"), 0o755); err != nil {
 		t.Fatal(err)
@@ -320,7 +389,7 @@ func TestAPI_upload(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	res := env.Run("api", "projects", "upload", "-f", "id=7717", "-f", "updating=terms", "--upload", "locales/en.json")
+	res := env.Run(c.args("-f", "id=7717", "-f", "updating=terms", "--upload", "locales/en.json")...)
 
 	if res.Err != nil {
 		t.Fatal(res.Err)
@@ -335,11 +404,12 @@ func TestAPI_upload(t *testing.T) {
 }
 
 func TestAPI_account(t *testing.T) {
+	c := someRaw(t, false)
 	fake := testutil.NewFakeAPI(t)
-	fake.Stub("contributors/list", testutil.OK(map[string]any{"languages": []any{}}))
+	fake.Stub(c.endpoint, testutil.OK(map[string]any{"languages": []any{}}))
 	env := testutil.NewEnv(t, fake).Login("personal", "tok-personal").Login("client-a", "tok-client")
 
-	res := env.Run("api", "contributors", "list", "--id", "7", "--account", "client-a")
+	res := env.Run(c.args("--id", "7", "--account", "client-a")...)
 
 	if res.Err != nil {
 		t.Fatal(res.Err)
@@ -350,17 +420,18 @@ func TestAPI_account(t *testing.T) {
 }
 
 func TestAPI_apiFailure(t *testing.T) {
+	c := someRaw(t, false)
 	for _, tt := range []struct {
 		name       string
 		args       []string
 		wantStdout bool
 	}{
-		{"result", []string{"api", "projects", "view", "-f", "id=1"}, false},
-		{"envelope", []string{"api", "projects", "view", "-f", "id=1", "--envelope"}, true},
+		{"result", c.args("-f", "id=1"), false},
+		{"envelope", c.args("-f", "id=1", "--envelope"), true},
 	} {
 		t.Run(tt.name, func(t *testing.T) {
 			fake := testutil.NewFakeAPI(t)
-			fake.Stub("projects/view", testutil.Fail("4012", "Invalid project"))
+			fake.Stub(c.endpoint, testutil.Fail("4012", "Invalid project"))
 
 			res := testutil.Run(t, fake, tt.args...)
 
@@ -378,7 +449,7 @@ func TestAPI_apiFailure(t *testing.T) {
 }
 
 func TestAPI_notLoggedIn(t *testing.T) {
-	res := testutil.Run(t, nil, "api", "contributors", "list", "--id", "7")
+	res := testutil.Run(t, nil, someRaw(t, false).args("--id", "7")...)
 
 	if !errors.Is(res.Err, accounts.ErrNotLoggedIn) {
 		t.Fatalf("err = %v", res.Err)
@@ -386,26 +457,28 @@ func TestAPI_notLoggedIn(t *testing.T) {
 }
 
 func TestAPI_badArguments(t *testing.T) {
+	c := someRaw(t, false)
 	tests := []struct {
 		name string
 		args []string
 		want string
 	}{
-		{"an argument", []string{"api", "projects", "view", "7717"}, `unexpected argument "7717": API parameters are given as --name value`},
-		{"an argument after --", []string{"api", "projects", "view", "--", "--id"}, `unexpected argument "--id"`},
+		{"an argument", c.args("7717"), `unexpected argument "7717": API parameters are given as --name value`},
+		{"an argument after --", c.args("--", "--id"), `unexpected argument "--id"`},
+		{"token as a parameter flag", c.args("--api-token", "x"), "--api-token: the token comes from the account"},
+		{"parameter flag without a name", c.args("--=x"), "--=x: missing parameter name"},
+		{"unknown shorthand", c.args("-i", "7717"), `unknown shorthand flag "-i": API parameters are given as --name value`},
+		{"our flag with a bad value", c.args("--json=maybe"), "invalid argument"},
+		{"field without =", c.args("-f", "id"), `--field "id": use key=value`},
+		{"field with empty key", c.args("-f", "=1"), `--field "=1": use key=value`},
+		{"token as a field", c.args("-f", "api_token=x"), "the token comes from the account"},
+		{"token from a file", c.args("-F", "api_token=t.txt"), "the token comes from the account"},
+		{"missing field file", c.args("-F", "data=nope.json"), "--field-file data: open"},
+		{"missing upload", c.args("--upload", "nope.json"), "--upload: open"},
+		// routing to an endpoint: the same whether it is raw or dedicated
 		{"not an endpoint", []string{"api", "projects", "frobnicate", "--id", "1"}, `unknown command "frobnicate" for "poeditor api projects"`},
 		{"a typo gets a suggestion", []string{"api", "projects", "veiw", "--id", "1"}, "Did you mean this?\n\tview"},
 		{"the API docs' spelling", []string{"api", "projects/view", "--id", "1"}, `unknown command "projects/view" for "poeditor api"`},
-		{"token as a parameter flag", []string{"api", "contributors", "list", "--api-token", "x"}, "--api-token: the token comes from the account"},
-		{"parameter flag without a name", []string{"api", "contributors", "list", "--=x"}, "--=x: missing parameter name"},
-		{"unknown shorthand", []string{"api", "projects", "view", "-i", "7717"}, `unknown shorthand flag "-i": API parameters are given as --name value`},
-		{"our flag with a bad value", []string{"api", "contributors", "list", "--json=maybe"}, "invalid argument"},
-		{"field without =", []string{"api", "projects", "view", "-f", "id"}, `--field "id": use key=value`},
-		{"field with empty key", []string{"api", "projects", "view", "-f", "=1"}, `--field "=1": use key=value`},
-		{"token as a field", []string{"api", "contributors", "list", "-f", "api_token=x"}, "the token comes from the account"},
-		{"token from a file", []string{"api", "contributors", "list", "-F", "api_token=t.txt"}, "the token comes from the account"},
-		{"missing field file", []string{"api", "terms", "add", "-F", "data=nope.json"}, "--field-file data: open"},
-		{"missing upload", []string{"api", "projects", "upload", "--upload", "nope.json"}, "--upload: open"},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
@@ -426,14 +499,15 @@ func TestAPI_badArguments(t *testing.T) {
 // PHP's json_encode escapes every non-ASCII character (\u00e9); nested cells
 // and --json must show the characters, not the escapes.
 func TestAPI_unicodeEscapesAreDecoded(t *testing.T) {
+	c := someRaw(t, false)
 	result := `{"terms":[{"term":"caf\u00e9","translation":{"content":"\u0421\u043e\u0445\u0440\u0430\u043d\u0438\u0442\u044c \u4fdd\u5b58 \ud83d\ude00 \"q\" <b>"}}]}`
 	for _, args := range [][]string{
-		{"api", "contributors", "list", "--id", "7717"},
-		{"api", "contributors", "list", "--id", "7717", "--json"},
+		c.args("--id", "7717"),
+		c.args("--id", "7717", "--json"),
 	} {
 		t.Run(strings.Join(args[3:], " "), func(t *testing.T) {
 			fake := testutil.NewFakeAPI(t)
-			fake.Stub("contributors/list", testutil.OK(json.RawMessage(result)))
+			fake.Stub(c.endpoint, testutil.OK(json.RawMessage(result)))
 			env := testutil.NewEnv(t, fake).Login("default", testutil.TestToken)
 			env.Width = 200
 
