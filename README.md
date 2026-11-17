@@ -140,4 +140,4 @@ language or account that does not exist. A read-only token is enough for `pull`.
 
 - `poeditor <command> --help` for every command and flag.
 - [POEditor API v2 reference](https://poeditor.com/docs/api)
-- Questions or problems: [contact POEditor](https://poeditor.com/contact) or open an issue.
+- Questions or problems: [contact POEditor](https://poeditor.com/contact/) or open an issue.
