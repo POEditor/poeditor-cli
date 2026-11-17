@@ -1,0 +1,46 @@
+[
+  {
+    "name": "Ana Pop",
+    "email": "ana@example.com",
+    "permissions": [
+      {
+        "project": {
+          "id": 7717,
+          "name": "Web"
+        },
+        "type": "contributor",
+        "proofreader": true,
+        "languages": [
+          "fr",
+          "de"
+        ]
+      },
+      {
+        "project": {
+          "id": 4321,
+          "name": "Mobile app"
+        },
+        "type": "contributor",
+        "proofreader": false,
+        "languages": [
+          "fr"
+        ]
+      }
+    ]
+  },
+  {
+    "name": "Bo",
+    "email": "bo@example.com",
+    "permissions": [
+      {
+        "project": {
+          "id": 7717,
+          "name": "Web"
+        },
+        "type": "administrator",
+        "proofreader": true,
+        "languages": []
+      }
+    ]
+  }
+]

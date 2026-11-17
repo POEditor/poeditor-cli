@@ -7,6 +7,7 @@ package api
 import (
 	"github.com/spf13/cobra"
 
+	"github.com/POEditor/poeditor-cli/internal/cmd/api/contributors"
 	"github.com/POEditor/poeditor-cli/internal/cmd/api/languages"
 	"github.com/POEditor/poeditor-cli/internal/cmd/api/projects"
 	"github.com/POEditor/poeditor-cli/internal/cmd/api/pull"
@@ -46,7 +47,7 @@ or JSON; see their --help.`
 	cmd.Example = `  poeditor api projects list
   poeditor api terms list --project web --language fr
   poeditor api contributors list --id 7717`
-	must(cmdutil.AddUnique(cmd, projects.NewCmdProjects(f), languages.NewCmdLanguages(f), terms.NewCmdTerms(f), translations.NewCmdTranslations(f)))
+	must(cmdutil.AddUnique(cmd, contributors.NewCmdContributors(f), projects.NewCmdProjects(f), languages.NewCmdLanguages(f), terms.NewCmdTerms(f), translations.NewCmdTranslations(f)))
 	must(raw.AddEndpoints(f, cmd))
 	return cmd
 }
