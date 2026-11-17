@@ -101,8 +101,8 @@ func TestList_idSynonym(t *testing.T) {
 		t.Errorf("form = %v", req.Form)
 	}
 	help := testutil.Run(t, nil, "api", "terms", "list", "--help")
-	if strings.Contains(help.Stdout, "--id") {
-		t.Error("--id shows in --help; it is hidden")
+	if !strings.Contains(help.Stdout, "--id works too") || strings.Contains(help.Stdout, "--id string") {
+		t.Errorf("--help should name --id on the --project line, not as a row of its own:\n%s", help.Stdout)
 	}
 }
 

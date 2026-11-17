@@ -18,12 +18,13 @@ import (
 	"github.com/POEditor/poeditor-cli/internal/repoconfig"
 )
 
-// Add registers the required --project (-p) flag, and --id, a hidden
-// synonym with the API documentation's name, so a parameter copied from the
-// docs works too. Resolve checks that one of them was given: cobra's own
-// required check cannot know they are the same.
+// Add registers the required --project (-p) flag, and --id, a synonym with
+// the API documentation's name, so a parameter copied from the docs works
+// too. --id has no row of its own in --help: the --project line names it.
+// Resolve checks that one of them was given: cobra's own required check
+// cannot know they are the same.
 func Add(cmd *cobra.Command, value *string) {
-	cmd.Flags().StringVarP(value, "project", "p", "", "The project: its alias in .poeditor.yml, or its id (required)")
+	cmd.Flags().StringVarP(value, "project", "p", "", "The project: its alias in .poeditor.yml, or its id (required; --id works too)")
 	cmd.Flags().StringVar(value, "id", "", "Same as --project (the API's name for it)")
 	_ = cmd.Flags().MarkHidden("id")
 	cmd.MarkFlagsMutuallyExclusive("project", "id")

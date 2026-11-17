@@ -15,7 +15,8 @@ import (
 
 // The user docs (README.md and docs/*.md) must keep up with the commands:
 // every command has a section in its docs file, headed by its full name in
-// backticks, and every flag of the command is mentioned in that section.
+// backticks, and every flag of the command is mentioned in that section; a
+// hidden synonym (--id) at least once in the file.
 
 // docsFile is the docs file that documents cmd.
 func docsFile(cmd *cobra.Command) string {
@@ -45,10 +46,14 @@ func TestDocs_everyCommandAndFlag(t *testing.T) {
 			continue
 		}
 		cmd.LocalFlags().VisitAll(func(fl *pflag.Flag) {
-			if fl.Name == "help" || fl.Hidden {
-				return
-			}
-			if !strings.Contains(section, "--"+fl.Name) {
+			switch {
+			case fl.Name == "help":
+			case fl.Hidden:
+				// a synonym without its own --help row (--id): once per file is enough
+				if !strings.Contains(string(data), "`--"+fl.Name+"`") {
+					t.Errorf("docs/%s: flag --%s (of `%s`) is not mentioned anywhere", file, fl.Name, path)
+				}
+			case !strings.Contains(section, "--"+fl.Name):
 				t.Errorf("docs/%s, section `%s`: flag --%s is not mentioned", file, path, fl.Name)
 			}
 		})

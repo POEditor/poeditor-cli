@@ -66,7 +66,7 @@ or contributor (proofreader only when the project has proofreading on).`,
 	}
 
 	projectflag.Add(cmd, &project)
-	cmd.Flags().Lookup("project").Usage = "The project: its alias in .poeditor.yml, or its id (default: every project)"
+	cmd.Flags().Lookup("project").Usage = "The project: its alias in .poeditor.yml, or its id (default: every project; --id works too)"
 	cmd.Flags().StringVarP(&language, "language", "l", "", "Only the contributors of this `language` (needs --project)")
 	cmdutil.AddJSONFlag(cmd, &asJSON)
 	return cmd

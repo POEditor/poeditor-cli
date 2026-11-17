@@ -3,8 +3,8 @@
 `poeditor api translations` writes and deletes the translations of terms in one language, and
 machine-translates a project with Google, Microsoft or DeepL.
 
-Every command here takes `--project` (`-p`), an id or an alias from `.poeditor.yml`. See
-[Picking a project](projects.md#picking-a-project).
+Every command here takes `--project` (`-p`, or `--id` as in the API docs), an id or an alias
+from `.poeditor.yml`. See [Picking a project](projects.md#picking-a-project).
 
 [← back to the README](../README.md)
 

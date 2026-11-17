@@ -7,8 +7,8 @@ A term is identified by its **text and its context**: `save` with context `butto
 with no context are two terms. Every command that finds a term takes `--context`; leave it out
 for a term without context.
 
-Every command here takes `--project` (`-p`), an id or an alias from `.poeditor.yml`. See
-[Picking a project](projects.md#picking-a-project).
+Every command here takes `--project` (`-p`, or `--id` as in the API docs), an id or an alias
+from `.poeditor.yml`. See [Picking a project](projects.md#picking-a-project).
 
 [← back to the README](../README.md)
 

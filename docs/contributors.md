@@ -26,7 +26,7 @@ ID     PROJECT     NAME     EMAIL            ROLE           LANGUAGES
 
 | Flag | |
 |---|---|
-| `--project <alias or id>` (`-p`) | Only this project. Without it: every project of the account. |
+| `--project <alias or id>` (`-p`, or `--id`) | Only this project. Without it: every project of the account. |
 | `--language <code>` (`-l`) | Only the contributors of this language. Needs `--project`. |
 | `--json` | Print the contributors as JSON, each with their permissions per project. |
 
@@ -43,7 +43,7 @@ poeditor api contributors add bo@example.com --name Bo -p web --admin
 
 | Flag | |
 |---|---|
-| `--project <alias or id>` (`-p`) | The project (required). |
+| `--project <alias or id>` (`-p`, or `--id`) | The project (required). |
 | `--name <name>` | The person's name (required). |
 | `--language <code>` (`-l`) | The language to translate. One of `--language` or `--admin` is required. |
 | `--proofreader` | A proofreader of the language too. The project needs proofreading on. Someone who already translates the language becomes a proofreader. |
@@ -62,7 +62,7 @@ poeditor api contributors remove ana@example.com -p web --proofreader --yes
 
 | Flag | |
 |---|---|
-| `--project <alias or id>` (`-p`) | The project (required). |
+| `--project <alias or id>` (`-p`, or `--id`) | The project (required). |
 | `--language <code>` (`-l`) | Only from this language. |
 | `--proofreader` | Only the proofreader right; they keep translating. |
 | `--yes` | Remove. |

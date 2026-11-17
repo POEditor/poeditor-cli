@@ -97,6 +97,14 @@ upload limits.
 Every POEditor API v2 endpoint is one command, `poeditor api <group> <action>`: the API's
 `terms/add_comment` is `poeditor api terms add-comment`. Every command has `--help`.
 
+Commands that work on a project take `--project` (`-p`): its id, or its alias from
+`.poeditor.yml`. `--id`, the API's own name for it, works too:
+
+```sh
+poeditor api terms list --project web
+poeditor api terms list --id 12345
+```
+
 ### Output
 
 Commands that show data print a table on a terminal, and tab-separated lines without a header

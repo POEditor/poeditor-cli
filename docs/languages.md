@@ -8,8 +8,8 @@ Languages are always given by their POEditor code: `en`, `fr`, `pt-br`, `zh-Hans
 code is explained: either POEditor doesn't know it, or the project doesn't have it, and then
 the error lists the languages the project has.
 
-Every command here takes `--project` (`-p`), an id or an alias from `.poeditor.yml`, except
-`available`. See [Picking a project](projects.md#picking-a-project).
+Every command here except `available` takes `--project` (`-p`, or `--id` as in the API docs),
+an id or an alias from `.poeditor.yml`. See [Picking a project](projects.md#picking-a-project).
 
 [← back to the README](../README.md)
 

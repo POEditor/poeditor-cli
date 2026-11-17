@@ -2,6 +2,7 @@ package projectflag_test
 
 import (
 	"bytes"
+	"github.com/spf13/cobra"
 	"strconv"
 	"strings"
 	"testing"
@@ -152,5 +153,22 @@ func TestResolve_errors(t *testing.T) {
 				t.Errorf("error = %v, want it to contain %q", err, tt.want)
 			}
 		})
+	}
+}
+
+// --id is named on the --project line of --help, and has no row of its own.
+func TestAdd_helpNamesID(t *testing.T) {
+	cmd := &cobra.Command{Use: "x"}
+	var project string
+	projectflag.Add(cmd, &project)
+
+	if usage := cmd.Flags().Lookup("project").Usage; !strings.Contains(usage, "--id works too") {
+		t.Errorf("--project usage = %q", usage)
+	}
+	if !cmd.Flags().Lookup("id").Hidden {
+		t.Error("--id has a row of its own in --help")
+	}
+	if err := cmd.Flags().Parse([]string{"--id", "7717"}); err != nil || project != "7717" {
+		t.Errorf("--id 7717 → %q, %v", project, err)
 	}
 }

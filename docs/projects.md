@@ -14,9 +14,9 @@ never acts on the wrong project by accident:
 - an **alias** from [`.poeditor.yml`](config.md): `--project web`. The project's `account:`
   from the file is used too.
 
-`--id` is accepted as a synonym of `--project`, matching the API documentation's parameter
-name. Every command also takes the global `--account` (see
-[Accounts and tokens](auth.md)).
+`--id` works everywhere `--project` does: it is the API documentation's name for the
+parameter, so `--id 12345` copied from there just works. Every command also takes the global
+`--account` (see [Accounts and tokens](auth.md)).
 
 ## `poeditor api projects list`
 

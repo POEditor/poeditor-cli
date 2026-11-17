@@ -124,3 +124,12 @@ func TestList_errors(t *testing.T) {
 		}
 	})
 }
+
+// list words --project its own way (optional here); --id is still named.
+func TestList_helpNamesID(t *testing.T) {
+	help := testutil.Run(t, nil, "api", "contributors", "list", "--help")
+
+	if !strings.Contains(help.Stdout, "(default: every project; --id works too)") || strings.Contains(help.Stdout, "--id string") {
+		t.Errorf("--project line should say it is optional and name --id:\n%s", help.Stdout)
+	}
+}
