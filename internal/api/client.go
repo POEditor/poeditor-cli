@@ -3,8 +3,7 @@
 //
 //	{"response": {"status": "success|fail", "code": "200", "message": "OK"}, "result": {...}}
 //
-// Layout: client.go is the transport (post, upload, Download, *Error, and
-// Raw for `poeditor api` only); each
+// Layout: client.go is the transport (post, upload, Download, *Error); each
 // API group has its own file (projects.go, languages.go…) with one exported
 // method per endpoint, named after it (projects/list → ProjectsList), plus its
 // result types and an options struct when the endpoint has optional
@@ -75,24 +74,10 @@ type File struct {
 	Data  []byte
 }
 
-// Response is an undecoded API response (see Raw).
-type Response struct {
-	Body   json.RawMessage // the whole envelope, as received
-	Result json.RawMessage // its "result"; nil when the endpoint returns none
-}
-
-// Raw sends params (and file, unless nil) to any endpoint and returns the
-// response undecoded. An API failure returns the Response and an *Error.
-// Only `poeditor api` uses it: every other command calls a typed method.
-func (c *Client) Raw(ctx context.Context, endpoint string, params url.Values, file *File) (Response, error) {
-	env, body, err := c.send(ctx, endpoint, params, file)
-	return Response{Body: body, Result: env.Result}, err
-}
-
 // post calls endpoint (e.g. "projects/list") with params and decodes the
 // "result" object into result (which may be nil).
 func (c *Client) post(ctx context.Context, endpoint string, params url.Values, result any) error {
-	env, _, err := c.send(ctx, endpoint, params, nil)
+	env, err := c.send(ctx, endpoint, params, nil)
 	if err != nil {
 		return err
 	}
@@ -101,7 +86,7 @@ func (c *Client) post(ctx context.Context, endpoint string, params url.Values, r
 
 // upload is post as multipart/form-data, with one file.
 func (c *Client) upload(ctx context.Context, endpoint string, params url.Values, file File, result any) error {
-	env, _, err := c.send(ctx, endpoint, params, &file)
+	env, err := c.send(ctx, endpoint, params, &file)
 	if err != nil {
 		return err
 	}
@@ -119,17 +104,17 @@ func decodeResult(endpoint string, env envelope, result any) error {
 }
 
 // send POSTs params plus api_token (a url-encoded form, or multipart when
-// file is set) and returns the decoded envelope with the raw body. A "fail"
-// response returns both and an *Error.
-func (c *Client) send(ctx context.Context, endpoint string, params url.Values, file *File) (envelope, []byte, error) {
+// file is set) and returns the decoded envelope. A "fail" response is an
+// *Error.
+func (c *Client) send(ctx context.Context, endpoint string, params url.Values, file *File) (envelope, error) {
 	contentType, reqBody, err := c.encode(params, file)
 	if err != nil {
-		return envelope{}, nil, err
+		return envelope{}, err
 	}
 	endpointURL := strings.TrimRight(c.BaseURL, "/") + "/" + strings.TrimLeft(endpoint, "/")
 	req, err := http.NewRequestWithContext(ctx, http.MethodPost, endpointURL, reqBody)
 	if err != nil {
-		return envelope{}, nil, err
+		return envelope{}, err
 	}
 	req.Header.Set("Content-Type", contentType)
 	if c.UserAgent != "" {
@@ -138,23 +123,23 @@ func (c *Client) send(ctx context.Context, endpoint string, params url.Values, f
 
 	resp, err := c.HTTP.Do(req)
 	if err != nil {
-		return envelope{}, nil, fmt.Errorf("cannot reach the POEditor API: %w", err)
+		return envelope{}, fmt.Errorf("cannot reach the POEditor API: %w", err)
 	}
 	defer resp.Body.Close()
 
 	body, err := io.ReadAll(resp.Body)
 	if err != nil {
-		return envelope{}, nil, fmt.Errorf("cannot read the API response: %w", err)
+		return envelope{}, fmt.Errorf("cannot read the API response: %w", err)
 	}
 
 	var env envelope
 	if err := json.Unmarshal(body, &env); err != nil {
-		return envelope{}, nil, fmt.Errorf("unexpected API response (HTTP %d): %s", resp.StatusCode, snippet(body))
+		return envelope{}, fmt.Errorf("unexpected API response (HTTP %d): %s", resp.StatusCode, snippet(body))
 	}
 	if env.Response.Status != "success" {
-		return env, body, &Error{Code: env.Response.Code, Message: env.Response.Message}
+		return env, &Error{Code: env.Response.Code, Message: env.Response.Message}
 	}
-	return env, body, nil
+	return env, nil
 }
 
 // encode builds the request body: params plus api_token, url-encoded, or

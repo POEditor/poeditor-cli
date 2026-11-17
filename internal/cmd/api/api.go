@@ -12,7 +12,6 @@ import (
 	"github.com/POEditor/poeditor-cli/internal/cmd/api/projects"
 	"github.com/POEditor/poeditor-cli/internal/cmd/api/pull"
 	"github.com/POEditor/poeditor-cli/internal/cmd/api/push"
-	"github.com/POEditor/poeditor-cli/internal/cmd/api/raw"
 	"github.com/POEditor/poeditor-cli/internal/cmd/api/terms"
 	"github.com/POEditor/poeditor-cli/internal/cmd/api/translations"
 	"github.com/POEditor/poeditor-cli/internal/cmdutil"
@@ -31,24 +30,19 @@ var Module = cmdutil.Module{
 	},
 }
 
-// newCmdAPI returns `poeditor api`: one command per API v2 endpoint. The
-// dedicated ones come from their group packages; every other endpoint gets a
-// raw command until it has one.
+// newCmdAPI returns `poeditor api`: one command per API v2 endpoint, from
+// the group packages.
 func newCmdAPI(f *cmdutil.Factory) *cobra.Command {
 	cmd := cmdutil.NewGroup("api <group> <action>", "Call any POEditor API v2 endpoint")
 	cmd.Long = `Every POEditor API v2 endpoint, as <group> <action>: the API's
 projects/list is ` + "`poeditor api projects list`" + `, terms/add_comment is
 ` + "`poeditor api terms add-comment`" + `.
 
-Endpoints with a dedicated command have real flags (--project, --language)
-and tables made for them. The others send the request as it is: API parameters
-as flags named after them (--id 7717), the result printed as a generic table
-or JSON; see their --help.`
+To transfer the files of .poeditor.yml, use ` + "`poeditor pull`" + ` and ` + "`poeditor push`" + `.`
 	cmd.Example = `  poeditor api projects list
   poeditor api terms list --project web --language fr
-  poeditor api contributors list --id 7717`
-	must(cmdutil.AddUnique(cmd, contributors.NewCmdContributors(f), projects.NewCmdProjects(f), languages.NewCmdLanguages(f), terms.NewCmdTerms(f), translations.NewCmdTranslations(f)))
-	must(raw.AddEndpoints(f, cmd))
+  poeditor api contributors list --project 7717`
+	must(cmdutil.AddUnique(cmd, contributors.NewCmdContributors(f), languages.NewCmdLanguages(f), projects.NewCmdProjects(f), terms.NewCmdTerms(f), translations.NewCmdTranslations(f)))
 	return cmd
 }
 

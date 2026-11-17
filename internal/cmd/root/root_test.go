@@ -7,7 +7,6 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/POEditor/poeditor-cli/internal/cmd/api/raw"
 	"github.com/POEditor/poeditor-cli/internal/cmd/root"
 	"github.com/POEditor/poeditor-cli/internal/cmdutil"
 	"github.com/POEditor/poeditor-cli/internal/iostreams"
@@ -92,9 +91,9 @@ func TestCommandTree(t *testing.T) {
 	}
 
 	endpoints := map[string]bool{}
-	for _, endpoint := range raw.Endpoints {
+	for _, endpoint := range apiEndpoints {
 		group, action, _ := strings.Cut(endpoint, "/")
-		endpoints["poeditor api "+group+" "+raw.CommandName(action)] = true
+		endpoints["poeditor api "+group+" "+strings.ReplaceAll(action, "_", "-")] = true
 	}
 	found := map[string]bool{}
 	for _, cmd := range testutil.Leaves() {
@@ -112,13 +111,19 @@ func TestCommandTree(t *testing.T) {
 			t.Errorf("no command for %q", path)
 		}
 	}
-	for _, typed := range []string{"poeditor api projects list", "poeditor api terms list"} {
-		for _, cmd := range testutil.Leaves() {
-			if cmd.CommandPath() == typed && strings.HasSuffix(testutil.CommandPackage(cmd), "/raw") {
-				t.Errorf("%q is a raw command; it has a dedicated one", typed)
-			}
-		}
-	}
+}
+
+// apiEndpoints is every public API v2 endpoint, <group>/<action> (server:
+// application/modules/v2/controllers; listAll is list, addComment is
+// add_comment). translations/propose has a model but no controller action,
+// so it is not public. A new endpoint goes here with its command.
+var apiEndpoints = []string{
+	"projects/list", "projects/add", "projects/view", "projects/update", "projects/delete",
+	"projects/upload", "projects/sync", "projects/export",
+	"languages/available", "languages/list", "languages/add", "languages/update", "languages/delete",
+	"terms/list", "terms/add", "terms/update", "terms/delete", "terms/add_comment",
+	"translations/add", "translations/update", "translations/delete", "translations/automatic",
+	"contributors/list", "contributors/add", "contributors/remove",
 }
 
 // A group run with a word that is not one of its commands fails, at every
