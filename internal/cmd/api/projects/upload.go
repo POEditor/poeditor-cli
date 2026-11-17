@@ -91,7 +91,7 @@ says it is too early, the command waits and retries. To upload the files of
 	}
 
 	projectflag.Add(cmd, &project)
-	cmd.Flags().StringVar(&opts.Updating, "updating", "", "What the file brings: "+strings.Join(repoconfig.UpdatingModes, ", ")+" (required)")
+	cmd.Flags().StringVar(&opts.Updating, "updating", "", "What the file brings (`mode`: "+strings.Join(repoconfig.UpdatingModes, ", ")+"; required)")
 	cmd.Flags().StringVarP(&opts.Language, "language", "l", "", "The `language` of the file's translations (required unless --updating terms)")
 	cmd.Flags().BoolVar(&opts.Overwrite, "overwrite", false, "Replace existing translations")
 	cmd.Flags().BoolVar(&opts.SyncTerms, "sync-terms", false, "Delete the terms that are not in the file (needs --yes)")

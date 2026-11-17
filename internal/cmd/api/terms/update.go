@@ -111,7 +111,7 @@ get reviewed. The counts go to stderr; --json also prints them on stdout.`,
 	cmd.Flags().StringVar(&newContext, "new-context", "", "Change the term's `context`")
 	cmd.Flags().StringVar(&plural, "plural", "", "Set the plural `form` (\"\" makes it a normal term)")
 	cmd.Flags().StringVar(&reference, "reference", "", "Set where the term is used (\"\" clears it)")
-	cmd.Flags().StringArrayVar(&tags, "tag", nil, "Replace the term's tags with these (repeat for more)")
+	cmd.Flags().StringArrayVar(&tags, "tag", nil, "Replace the term's tags with this `tag` (repeat for more)")
 	cmd.Flags().BoolVar(&fuzzyTrigger, "fuzzy-trigger", false, "Mark the updated terms' translations fuzzy")
 	cmd.Flags().StringVar(&fromFile, "from-file", "", "Apply the updates of a JSON `file` (- for stdin) instead")
 	cmdutil.AddJSONFlag(cmd, &asJSON)

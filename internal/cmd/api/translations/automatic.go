@@ -78,7 +78,7 @@ When a pair fails, the command exits 1 after printing them all.`,
 	cmd.Flags().StringVar(&source, "source-language", "", "The `language` to translate from, as code[=provider code] (required)")
 	cmd.Flags().StringArrayVar(&targets, "target", nil, "A `language` to translate to, as code[=provider code] (repeat; required)")
 	cmd.Flags().StringArrayVar(&tags, "tag", nil, "Only the terms with this `tag` (repeat for more)")
-	cmd.Flags().StringVar(&tagsMatch, "tags-match", "", "How --tag matches: "+strings.Join(api.TagsMatchModes, ", ")+" (the API's default: any)")
+	cmd.Flags().StringVar(&tagsMatch, "tags-match", "", "How --tag matches (`mode`: "+strings.Join(api.TagsMatchModes, ", ")+"; the API's default: any)")
 	cmd.Flags().StringArrayVar(&options, "option", nil, "A provider option, `key=value` (repeat)")
 	_ = cmd.MarkFlagRequired("provider")
 	_ = cmd.MarkFlagRequired("source-language")
