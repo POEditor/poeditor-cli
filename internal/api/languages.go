@@ -2,7 +2,6 @@ package api
 
 import (
 	"context"
-	"errors"
 	"net/url"
 	"sort"
 )
@@ -94,17 +93,11 @@ type LanguageUpdateOptions struct {
 // import type import_def). The result counts are in Stats.Translations.
 // Rows must not be empty: the server takes an empty list for invalid data.
 func (c *Client) LanguagesUpdate(ctx context.Context, projectID int, code string, rows []TranslationRow, opts LanguageUpdateOptions) (Stats, error) {
-	if len(rows) == 0 {
-		return Stats{}, errors.New("languages/update: no translations to send")
-	}
-	params := languageParams(projectID, code)
-	params.Set("data", jsonParam(rows))
+	extra := url.Values{"language": {code}}
 	if opts.FuzzyTrigger {
-		params.Set("fuzzy_trigger", "1")
+		extra.Set("fuzzy_trigger", "1")
 	}
-	var result Stats
-	err := c.post(ctx, "languages/update", params, &result)
-	return result, err
+	return c.postRows(ctx, "languages/update", projectID, rows, len(rows), extra)
 }
 
 func languageParams(projectID int, code string) url.Values {

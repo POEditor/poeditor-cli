@@ -1,8 +1,6 @@
 package languages
 
 import (
-	"bytes"
-	"encoding/json"
 	"fmt"
 
 	"github.com/spf13/cobra"
@@ -102,30 +100,8 @@ func updateResult(p projectflag.Project, code string, s api.Stats) UpdateResult 
 	return r
 }
 
-// readRows reads and checks --from-file before any API call: a list of at
-// least one row, each naming its term. The server would skip a row without
-// a term silently, and take an empty list for invalid data.
+// readRows reads and checks --from-file before any API call. The server
+// would skip a row without a term silently.
 func readRows(f *cmdutil.Factory, path string) ([]api.TranslationRow, error) {
-	data, err := f.ReadFile(path)
-	if err != nil {
-		return nil, fmt.Errorf("--from-file: %w", err)
-	}
-	dec := json.NewDecoder(bytes.NewReader(data))
-	dec.DisallowUnknownFields()
-	var rows []api.TranslationRow
-	if err := dec.Decode(&rows); err != nil {
-		return nil, fmt.Errorf("--from-file %s: %w (want a JSON list: see --help)", path, err)
-	}
-	if dec.More() {
-		return nil, fmt.Errorf("--from-file %s: more than one JSON value (want one list: see --help)", path)
-	}
-	if len(rows) == 0 {
-		return nil, fmt.Errorf("--from-file %s: no translations in it", path)
-	}
-	for i, r := range rows {
-		if r.Term == "" {
-			return nil, fmt.Errorf("--from-file %s: entry %d has no \"term\"", path, i+1)
-		}
-	}
-	return rows, nil
+	return cmdutil.ReadJSONList(f, path, func(r api.TranslationRow) error { return r.TermKey.Check() })
 }

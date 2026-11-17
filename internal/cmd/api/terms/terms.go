@@ -10,6 +10,6 @@ import (
 // NewCmdTerms returns the `terms` command group.
 func NewCmdTerms(f *cmdutil.Factory) *cobra.Command {
 	cmd := cmdutil.NewGroup("terms <command>", "Work with a project's terms")
-	cmd.AddCommand(NewCmdList(f))
+	cmd.AddCommand(NewCmdAdd(f), NewCmdAddComment(f), NewCmdDelete(f), NewCmdList(f), NewCmdUpdate(f))
 	return cmd
 }

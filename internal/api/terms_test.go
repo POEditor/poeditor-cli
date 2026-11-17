@@ -70,3 +70,111 @@ func TestTermsList_withLanguage(t *testing.T) {
 		t.Errorf("proofreading off: proofread = %v, want nil", *tr.Proofread)
 	}
 }
+
+func strp(s string) *string { return &s }
+
+// Each bulk term endpoint sends its rows as "data", in the API's field names,
+// and returns the term counts.
+func TestTermsWrites(t *testing.T) {
+	tags := []string{}
+	tests := []struct {
+		name     string
+		endpoint string
+		call     func(*api.Client) (api.Stats, error)
+		data     string
+		extra    url.Values
+		result   string
+		want     api.TermStats
+	}{
+		{"add", "terms/add", func(c *api.Client) (api.Stats, error) {
+			return c.TermsAdd(context.Background(), 7717, []api.NewTerm{
+				{TermKey: api.TermKey{Term: "save", Context: "button"}, Plural: "saves", Reference: "a.js:1", Comment: "<b>x</b>", Tags: []string{"web"}},
+				{TermKey: api.TermKey{Term: "bare"}},
+			})
+		}, `[{"term":"save","context":"button","plural":"saves","reference":"a.js:1","comment":"<b>x</b>","tags":["web"]},{"term":"bare","context":""}]`,
+			nil, `{"terms":{"parsed":2,"added":1}}`, api.TermStats{Parsed: 2, Added: 1}},
+		{"update", "terms/update", func(c *api.Client) (api.Stats, error) {
+			return c.TermsUpdate(context.Background(), 7717, []api.TermUpdate{
+				{TermKey: api.TermKey{Term: "save"}, NewTerm: strp("store"), NewContext: strp(""), Reference: strp(""), Plural: strp("stores"), Tags: &tags},
+				{TermKey: api.TermKey{Term: "only-key", Context: "c"}},
+			}, api.TermsUpdateOptions{})
+		}, `[{"term":"save","context":"","new_term":"store","new_context":"","reference":"","plural":"stores","tags":[]},{"term":"only-key","context":"c"}]`,
+			nil, `{"terms":{"parsed":2,"updated":2}}`, api.TermStats{Parsed: 2, Updated: 2}},
+		{"update with fuzzy trigger", "terms/update", func(c *api.Client) (api.Stats, error) {
+			return c.TermsUpdate(context.Background(), 7717, []api.TermUpdate{{TermKey: api.TermKey{Term: "save"}, Plural: strp("saves")}}, api.TermsUpdateOptions{FuzzyTrigger: true})
+		}, `[{"term":"save","context":"","plural":"saves"}]`,
+			url.Values{"fuzzy_trigger": {"1"}}, `{"terms":{"parsed":1,"updated":1}}`, api.TermStats{Parsed: 1, Updated: 1}},
+		{"delete", "terms/delete", func(c *api.Client) (api.Stats, error) {
+			return c.TermsDelete(context.Background(), 7717, []api.TermKey{{Term: "save", Context: "button"}})
+		}, `[{"term":"save","context":"button"}]`,
+			nil, `{"terms":{"parsed":1,"deleted":1}}`, api.TermStats{Parsed: 1, Deleted: 1}},
+		{"add comment", "terms/add_comment", func(c *api.Client) (api.Stats, error) {
+			return c.TermsAddComment(context.Background(), 7717, []api.TermComment{
+				{TermKey: api.TermKey{Term: "save"}, Comment: "Check length", Pinned: 1},
+				{TermKey: api.TermKey{Term: "open"}, Comment: "ok"},
+			})
+		}, `[{"term":"save","context":"","comment":"Check length","pinned":1},{"term":"open","context":"","comment":"ok"}]`,
+			nil, `{"terms":{"parsed":2,"with_added_comment":2}}`, api.TermStats{Parsed: 2, WithAddedComment: 2}},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			var rec recorder
+			client := rec.client(t, tt.result)
+
+			stats, err := tt.call(client)
+
+			if err != nil {
+				t.Fatal(err)
+			}
+			want := url.Values{"id": {"7717"}, "data": {tt.data}}
+			for k, v := range tt.extra {
+				want[k] = v
+			}
+			rec.assertForm(t, tt.endpoint, want)
+			if stats.Terms == nil || *stats.Terms != tt.want {
+				t.Errorf("stats = %+v, want %+v", stats.Terms, tt.want)
+			}
+		})
+	}
+}
+
+func TestTermsWrites_nothingToSend(t *testing.T) {
+	var rec recorder
+	client := rec.client(t, `null`)
+
+	if _, err := client.TermsDelete(context.Background(), 7717, nil); err == nil {
+		t.Error("no error for an empty list")
+	}
+	if rec.path != "" {
+		t.Errorf("a request was sent: %s", rec.path)
+	}
+}
+
+func TestTermWriteChecks(t *testing.T) {
+	tests := []struct {
+		name string
+		err  error
+		want string // "" = valid
+	}{
+		{"key", api.TermKey{Term: "save"}.Check(), ""},
+		{"key without term", api.TermKey{Context: "c"}.Check(), `no "term"`},
+		{"key with a blank term", api.TermKey{Term: " \n"}.Check(), `no "term"`},
+		{"update", api.TermUpdate{TermKey: api.TermKey{Term: "save"}, NewTerm: strp("store")}.Check(), ""},
+		{"update without term", api.TermUpdate{NewTerm: strp("store")}.Check(), `no "term"`},
+		{"update to an empty term", api.TermUpdate{TermKey: api.TermKey{Term: "save"}, NewTerm: strp(" ")}.Check(), `"new_term" is empty`},
+		{"comment", api.TermComment{TermKey: api.TermKey{Term: "save"}, Comment: "x"}.Check(), ""},
+		{"comment without text", api.TermComment{TermKey: api.TermKey{Term: "save"}, Comment: "  "}.Check(), `no "comment"`},
+		{"comment without term", api.TermComment{Comment: "x"}.Check(), `no "term"`},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			got := ""
+			if tt.err != nil {
+				got = tt.err.Error()
+			}
+			if got != tt.want {
+				t.Errorf("got %q, want %q", got, tt.want)
+			}
+		})
+	}
+}
