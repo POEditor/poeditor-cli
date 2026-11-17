@@ -13,6 +13,7 @@ import (
 	"github.com/POEditor/poeditor-cli/internal/cmd/api/push"
 	"github.com/POEditor/poeditor-cli/internal/cmd/api/raw"
 	"github.com/POEditor/poeditor-cli/internal/cmd/api/terms"
+	"github.com/POEditor/poeditor-cli/internal/cmd/api/translations"
 	"github.com/POEditor/poeditor-cli/internal/cmdutil"
 )
 
@@ -45,7 +46,7 @@ or JSON; see their --help.`
 	cmd.Example = `  poeditor api projects list
   poeditor api terms list --project web --language fr
   poeditor api contributors list --id 7717`
-	must(cmdutil.AddUnique(cmd, projects.NewCmdProjects(f), languages.NewCmdLanguages(f), terms.NewCmdTerms(f)))
+	must(cmdutil.AddUnique(cmd, projects.NewCmdProjects(f), languages.NewCmdLanguages(f), terms.NewCmdTerms(f), translations.NewCmdTranslations(f)))
 	must(raw.AddEndpoints(f, cmd))
 	return cmd
 }

@@ -53,7 +53,7 @@ get reviewed. The counts go to stderr; --json also prints them on stdout.`,
   poeditor api terms update -p web --from-file renames.json --fuzzy-trigger`,
 		Args: cobra.MaximumNArgs(1),
 		RunE: func(cmd *cobra.Command, args []string) error {
-			if err := checkInput(cmd, args, fromFile, 1, "a term", append([]string{"context"}, updateFlags...)...); err != nil {
+			if err := cmdutil.CheckBulkInput(cmd, args, fromFile, 1, "a term", append([]string{"context"}, updateFlags...)...); err != nil {
 				return err
 			}
 			var updates []api.TermUpdate

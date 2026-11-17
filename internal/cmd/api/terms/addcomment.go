@@ -39,7 +39,7 @@ The counts go to stderr; --json also prints them on stdout.`,
   poeditor api terms add-comment -p web --from-file comments.json`,
 		Args: cobra.MaximumNArgs(2),
 		RunE: func(cmd *cobra.Command, args []string) error {
-			if err := checkInput(cmd, args, fromFile, 2, "a term and the comment", "context", "pinned"); err != nil {
+			if err := cmdutil.CheckBulkInput(cmd, args, fromFile, 2, "a term and the comment", "context", "pinned"); err != nil {
 				return err
 			}
 			var comments []api.TermComment

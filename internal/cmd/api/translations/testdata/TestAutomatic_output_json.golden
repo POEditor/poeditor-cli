@@ -1,0 +1,20 @@
+{
+  "project": {
+    "id": 7717,
+    "alias": "web"
+  },
+  "provider": "google",
+  "successful": [
+    {
+      "source": "en",
+      "target": "fr",
+      "characters": 1204
+    },
+    {
+      "source": "en",
+      "target": "pt-BR",
+      "characters": 1180
+    }
+  ],
+  "failed": []
+}

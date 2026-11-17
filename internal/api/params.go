@@ -19,9 +19,19 @@ func jsonParam(v any) string {
 	enc := json.NewEncoder(&b)
 	enc.SetEscapeHTML(false)
 	if err := enc.Encode(v); err != nil {
-		// only called with []string, structs of []string and the bulk row
-		// types (TranslationRow, NewTerm…), which always encode
+		// only called with []string, structs of []string, maps of those and
+		// the bulk row types (TranslationRow, NewTerm…), which always encode
 		panic(err)
 	}
 	return strings.TrimSuffix(b.String(), "\n")
 }
+
+// How a tag filter matches terms (tags_match; server: TagsMatchMode).
+const (
+	TagsMatchAll     = "all"     // terms with every tag
+	TagsMatchAny     = "any"     // terms with at least one
+	TagsMatchExclude = "exclude" // terms with none of them
+)
+
+// TagsMatchModes lists the tags_match values.
+var TagsMatchModes = []string{TagsMatchAll, TagsMatchAny, TagsMatchExclude}

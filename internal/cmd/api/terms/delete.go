@@ -39,7 +39,7 @@ The counts go to stderr; --json also prints them on stdout.`,
 			if project == "" {
 				return projectflag.ErrMissing
 			}
-			if err := checkInput(cmd, args, fromFile, 1, "a term", "context"); err != nil {
+			if err := cmdutil.CheckBulkInput(cmd, args, fromFile, 1, "a term", "context"); err != nil {
 				return err
 			}
 			keys, err := termKeys(f, fromFile, args, context)

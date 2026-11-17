@@ -1,0 +1,4 @@
+SOURCE  TARGET  CHARACTERS  ERROR
+en      fr      1204
+en                          Invalid pair.
+en      ar                  Not enough automatic translation characters.

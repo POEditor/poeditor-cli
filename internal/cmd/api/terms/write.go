@@ -1,10 +1,7 @@
 package terms
 
 import (
-	"errors"
 	"fmt"
-
-	"github.com/spf13/cobra"
 
 	"github.com/POEditor/poeditor-cli/internal/cmdutil"
 	"github.com/POEditor/poeditor-cli/internal/projectflag"
@@ -14,27 +11,6 @@ import (
 // Code shared by the commands that write terms (add, update, delete,
 // add-comment): each takes one term from its arguments and flags, or many
 // from --from-file, and reports the API's counts.
-
-// checkInput checks that the terms come from one place: --from-file, or
-// the arguments plus rowFlags (the flags that describe one term). nArgs is
-// how many arguments one term takes.
-func checkInput(cmd *cobra.Command, args []string, fromFile string, nArgs int, usage string, rowFlags ...string) error {
-	if fromFile == "" {
-		if len(args) != nArgs {
-			return fmt.Errorf("give %s, or --from-file (see --help)", usage)
-		}
-		return nil
-	}
-	if len(args) > 0 {
-		return errors.New("--from-file: give the terms in the file or as arguments, not both")
-	}
-	for _, name := range rowFlags {
-		if cmd.Flags().Changed(name) {
-			return fmt.Errorf("--%s: with --from-file, give it in the file, for each term", name)
-		}
-	}
-	return nil
-}
 
 // writeResult is what --json prints: our own shape, like push's.
 type writeResult struct {

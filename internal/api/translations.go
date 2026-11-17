@@ -2,14 +2,17 @@ package api
 
 import (
 	"bytes"
+	"context"
 	"encoding/json"
 	"errors"
 	"fmt"
+	"net/url"
 )
 
 // TranslationRow is one translation to write: the term it belongs to and its
-// text (languages/update; later translations/add and update). The server
-// skips a row without a term (ApiV2_Languages_Update::isUserSentDataValid).
+// text (languages/update, translations/add and update). The server skips a
+// row without a term (ApiV2_Languages_Update::isUserSentDataValid).
+// translations/add and update ignore Fuzzy ($enable_fuzzy_flag = false).
 type TranslationRow struct {
 	TermKey
 	Translation TranslationText `json:"translation"`
@@ -139,4 +142,104 @@ func writeJSONString(b *bytes.Buffer, s string) {
 	enc.SetEscapeHTML(false)
 	_ = enc.Encode(s)       // a string always encodes
 	b.Truncate(b.Len() - 1) // Encode ends with a newline
+}
+
+// TranslationsAdd calls translations/add: fills the given terms' empty
+// translations in one language; existing ones are left as they are
+// (overwrite 0). The counts are Stats.Translations: parsed, added.
+func (c *Client) TranslationsAdd(ctx context.Context, projectID int, language string, rows []TranslationRow) (Stats, error) {
+	return c.postRows(ctx, "translations/add", projectID, rows, len(rows), url.Values{"language": {language}})
+}
+
+// TranslationsUpdate calls translations/update: overwrites the given terms'
+// existing translations in one language; a term without one is skipped.
+// The counts are Stats.Translations: parsed, updated.
+func (c *Client) TranslationsUpdate(ctx context.Context, projectID int, language string, rows []TranslationRow) (Stats, error) {
+	return c.postRows(ctx, "translations/update", projectID, rows, len(rows), url.Values{"language": {language}})
+}
+
+// TranslationsDelete calls translations/delete: deletes the given terms'
+// translations in one language. The counts are Stats.Translations: parsed,
+// deleted.
+func (c *Client) TranslationsDelete(ctx context.Context, projectID int, language string, terms []TermKey) (Stats, error) {
+	return c.postRows(ctx, "translations/delete", projectID, terms, len(terms), url.Values{"language": {language}})
+}
+
+// Automatic translation providers (server: ApiV2_Translations_Automatic::PROVIDERS).
+const (
+	ProviderGoogle    = "google"
+	ProviderMicrosoft = "microsoft"
+	ProviderDeepL     = "deepl"
+)
+
+// Providers lists the automatic translation providers.
+var Providers = []string{ProviderGoogle, ProviderMicrosoft, ProviderDeepL}
+
+// AutomaticOptions are the parameters of translations/automatic.
+type AutomaticOptions struct {
+	Provider string // one of Providers
+	// SourceLanguage is the project language to translate from; the
+	// provider's code for it is ProviderSourceLanguage.
+	SourceLanguage         string
+	ProviderSourceLanguage string
+	Targets                []AutomaticTarget
+	Tags                   []string          // only the terms with these tags (options.tags)
+	TagsMatch              string            // TagsMatchAll | Any | Exclude; sent only with Tags
+	Options                map[string]string // provider options (format, formality…)
+}
+
+// AutomaticTarget is a language to translate to: its project code and the
+// provider's code for it.
+type AutomaticTarget struct {
+	ProjectLanguage  string `json:"project_language"`
+	ProviderLanguage string `json:"provider_language"`
+}
+
+// AutomaticResult is translations/automatic's result: one entry per
+// language pair (server: ApiMachineTranslationsBatchProcessor::prepareMessageForPair).
+type AutomaticResult struct {
+	Successful []AutomaticPair `json:"successful"`
+	Failed     []AutomaticPair `json:"failed"`
+}
+
+// AutomaticPair is a language pair, in the provider's codes. Target is ""
+// when the server found no pair; Chars is set on success, Message on failure.
+type AutomaticPair struct {
+	Source  string `json:"source"`
+	Target  string `json:"target"`
+	Chars   int    `json:"chars"`
+	Message string `json:"message"`
+}
+
+// TranslationsAutomatic calls translations/automatic. A pair that failed is
+// in AutomaticResult.Failed, not an error; the API refuses the call (an
+// *Error, code 4040) when every pair failed or the input is wrong.
+func (c *Client) TranslationsAutomatic(ctx context.Context, projectID int, o AutomaticOptions) (AutomaticResult, error) {
+	targets := o.Targets
+	if targets == nil {
+		targets = []AutomaticTarget{}
+	}
+	params := url.Values{
+		"id":                       {idParam(projectID)},
+		"provider":                 {o.Provider},
+		"source_language":          {o.SourceLanguage},
+		"provider_source_language": {o.ProviderSourceLanguage},
+		"target_languages":         {jsonParam(targets)},
+	}
+	options := map[string]any{}
+	for k, v := range o.Options {
+		options[k] = v
+	}
+	if len(o.Tags) > 0 {
+		options["tags"] = o.Tags
+		if o.TagsMatch != "" {
+			options["tags_match"] = o.TagsMatch
+		}
+	}
+	if len(options) > 0 {
+		params.Set("options", jsonParam(options))
+	}
+	var result AutomaticResult
+	err := c.post(ctx, "translations/automatic", params, &result)
+	return result, err
 }
