@@ -7,7 +7,9 @@ package cmdutil
 import (
 	"context"
 	"errors"
+	"io"
 	"os"
+	"path/filepath"
 	"time"
 
 	"golang.org/x/term"
@@ -153,4 +155,20 @@ func (f *Factory) APIClient() (*api.Client, error) {
 // APIClientWithToken returns a client for an explicit token (auth login).
 func (f *Factory) APIClientWithToken(token string) *api.Client {
 	return api.NewClient(f.BaseURL, token, "poeditor-cli/"+build.Version)
+}
+
+// ReadFile reads a file named on the command line: relative to the working
+// directory, or stdin for "-".
+func (f *Factory) ReadFile(path string) ([]byte, error) {
+	if path == "-" {
+		return io.ReadAll(f.IO.In)
+	}
+	if !filepath.IsAbs(path) {
+		dir, err := f.WorkingDir()
+		if err != nil {
+			return nil, err
+		}
+		path = filepath.Join(dir, path)
+	}
+	return os.ReadFile(path)
 }

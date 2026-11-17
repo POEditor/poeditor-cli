@@ -5,9 +5,11 @@
 package projectflag
 
 import (
+	"context"
 	"errors"
 	"fmt"
 	"strconv"
+	"strings"
 
 	"github.com/spf13/cobra"
 
@@ -36,6 +38,7 @@ type Project struct {
 	Label   string // the alias, else the id: how messages name it
 	Account string // the account its requests use
 	Client  *api.Client
+	Ref     repoconfig.ProjectRef // how --json names it: {id, alias?}
 }
 
 // Resolve turns --project into a project and its client.
@@ -79,7 +82,7 @@ func Resolve(f *cmdutil.Factory, value string) (Project, error) {
 	if err != nil {
 		return Project{}, err
 	}
-	return Project{ID: p.ID, Label: p.Label(), Account: account.Name, Client: f.APIClientWithToken(account.Token)}, nil
+	return Project{ID: p.ID, Label: p.Label(), Account: account.Name, Client: f.APIClientWithToken(account.Token), Ref: p.Ref()}, nil
 }
 
 // loadConfig returns .poeditor.yml, or nil when there is none.
@@ -101,4 +104,26 @@ func loadConfig(f *cmdutil.Factory) (*repoconfig.Config, error) {
 func parseID(value string) (int, bool) {
 	id, err := strconv.Atoi(value)
 	return id, err == nil && id > 0
+}
+
+// LanguageError explains an API refusal of a language code — subject names
+// it as the user gave it ("--language xx", or "xx" for an argument). Any
+// other error is returned as it is. Only then are the project's languages
+// fetched, so a correct call costs one request.
+func (p Project) LanguageError(ctx context.Context, subject string, err error) error {
+	var apiErr *api.Error
+	if !errors.As(err, &apiErr) {
+		return err
+	}
+	switch apiErr.Code {
+	case api.CodeUnknownLanguage:
+		return fmt.Errorf("%s: not a language code POEditor knows (e.g. en, fr, pt-br; all of them: `poeditor api languages available`)", subject)
+	case api.CodeLanguageNotInProject:
+		codes, listErr := p.Client.LanguageCodes(ctx, p.ID)
+		if listErr != nil || len(codes) == 0 {
+			return fmt.Errorf("%s: project %s has no such language", subject, p.Label)
+		}
+		return fmt.Errorf("%s: project %s has no such language (it has: %s)", subject, p.Label, strings.Join(codes, ", "))
+	}
+	return err
 }

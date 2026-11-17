@@ -49,16 +49,16 @@ func TestAPI_output(t *testing.T) {
 		result string // "" = the endpoint returns no result
 		tty    bool
 	}{
-		{"list", []string{"api", "languages", "list"}, projectsResult, true},
-		{"list_piped", []string{"api", "languages", "list"}, projectsResult, false},
+		{"list", []string{"api", "contributors", "list"}, projectsResult, true},
+		{"list_piped", []string{"api", "contributors", "list"}, projectsResult, false},
 		{"terms", []string{"api", "contributors", "list", "--id", "7717"}, termsResult, true},
 		{"terms_piped", []string{"api", "contributors", "list", "--id", "7717"}, termsResult, false},
-		{"list_empty", []string{"api", "languages", "list"}, emptyResult, true},
-		{"list_empty_piped", []string{"api", "languages", "list"}, emptyResult, false},
+		{"list_empty", []string{"api", "contributors", "list"}, emptyResult, true},
+		{"list_empty_piped", []string{"api", "contributors", "list"}, emptyResult, false},
 		{"object", []string{"api", "projects", "view", "-f", "id=7717"}, projectResult, true},
 		{"object_piped", []string{"api", "projects", "view", "-f", "id=7717"}, projectResult, false},
 		{"stats", []string{"api", "terms", "add", "-f", "id=7717"}, statsResult, true},
-		{"values", []string{"api", "languages", "available"}, codesResult, true},
+		{"values", []string{"api", "contributors", "add"}, codesResult, true},
 		{"scalar", []string{"api", "projects", "export", "-f", "id=7717"}, urlResult, true},
 		{"json", []string{"api", "projects", "view", "-f", "id=7717", "--json"}, projectResult, true},
 		{"envelope", []string{"api", "projects", "view", "-f", "id=7717", "--envelope"}, projectResult, true},
@@ -95,11 +95,11 @@ func TestAPI_output(t *testing.T) {
 
 func TestAPI_output_narrowTerminal(t *testing.T) {
 	fake := testutil.NewFakeAPI(t)
-	fake.Stub("languages/list", testutil.OK(json.RawMessage(projectsResult)))
+	fake.Stub("contributors/list", testutil.OK(json.RawMessage(projectsResult)))
 	env := testutil.NewEnv(t, fake).Login("default", testutil.TestToken)
 	env.Width = 60
 
-	res := env.Run("api", "languages", "list")
+	res := env.Run("api", "contributors", "list")
 
 	if res.Err != nil {
 		t.Fatal(res.Err)
@@ -188,10 +188,10 @@ func TestAPI_everyEndpoint(t *testing.T) {
 // Raw commands that delete data send nothing without --yes, and say how to
 // send it; with --yes the request goes out (yes itself is not a parameter).
 func TestAPI_deletesNeedYes(t *testing.T) {
+	// the deleting endpoints that still have a raw command (a dedicated one tests its own --yes)
 	deleting := map[string][]string{
 		"projects/delete":     {"api", "projects", "delete"},
 		"projects/sync":       {"api", "projects", "sync"},
-		"languages/delete":    {"api", "languages", "delete"},
 		"terms/delete":        {"api", "terms", "delete"},
 		"translations/delete": {"api", "translations", "delete"},
 		"contributors/remove": {"api", "contributors", "remove"},
@@ -336,10 +336,10 @@ func TestAPI_upload(t *testing.T) {
 
 func TestAPI_account(t *testing.T) {
 	fake := testutil.NewFakeAPI(t)
-	fake.Stub("languages/list", testutil.OK(map[string]any{"languages": []any{}}))
+	fake.Stub("contributors/list", testutil.OK(map[string]any{"languages": []any{}}))
 	env := testutil.NewEnv(t, fake).Login("personal", "tok-personal").Login("client-a", "tok-client")
 
-	res := env.Run("api", "languages", "list", "--id", "7", "--account", "client-a")
+	res := env.Run("api", "contributors", "list", "--id", "7", "--account", "client-a")
 
 	if res.Err != nil {
 		t.Fatal(res.Err)
@@ -378,7 +378,7 @@ func TestAPI_apiFailure(t *testing.T) {
 }
 
 func TestAPI_notLoggedIn(t *testing.T) {
-	res := testutil.Run(t, nil, "api", "languages", "list", "--id", "7")
+	res := testutil.Run(t, nil, "api", "contributors", "list", "--id", "7")
 
 	if !errors.Is(res.Err, accounts.ErrNotLoggedIn) {
 		t.Fatalf("err = %v", res.Err)
@@ -396,14 +396,14 @@ func TestAPI_badArguments(t *testing.T) {
 		{"not an endpoint", []string{"api", "projects", "frobnicate", "--id", "1"}, `unknown command "frobnicate" for "poeditor api projects"`},
 		{"a typo gets a suggestion", []string{"api", "projects", "veiw", "--id", "1"}, "Did you mean this?\n\tview"},
 		{"the API docs' spelling", []string{"api", "projects/view", "--id", "1"}, `unknown command "projects/view" for "poeditor api"`},
-		{"token as a parameter flag", []string{"api", "languages", "list", "--api-token", "x"}, "--api-token: the token comes from the account"},
-		{"parameter flag without a name", []string{"api", "languages", "list", "--=x"}, "--=x: missing parameter name"},
+		{"token as a parameter flag", []string{"api", "contributors", "list", "--api-token", "x"}, "--api-token: the token comes from the account"},
+		{"parameter flag without a name", []string{"api", "contributors", "list", "--=x"}, "--=x: missing parameter name"},
 		{"unknown shorthand", []string{"api", "projects", "view", "-i", "7717"}, `unknown shorthand flag "-i": API parameters are given as --name value`},
-		{"our flag with a bad value", []string{"api", "languages", "list", "--json=maybe"}, "invalid argument"},
+		{"our flag with a bad value", []string{"api", "contributors", "list", "--json=maybe"}, "invalid argument"},
 		{"field without =", []string{"api", "projects", "view", "-f", "id"}, `--field "id": use key=value`},
 		{"field with empty key", []string{"api", "projects", "view", "-f", "=1"}, `--field "=1": use key=value`},
-		{"token as a field", []string{"api", "languages", "list", "-f", "api_token=x"}, "the token comes from the account"},
-		{"token from a file", []string{"api", "languages", "list", "-F", "api_token=t.txt"}, "the token comes from the account"},
+		{"token as a field", []string{"api", "contributors", "list", "-f", "api_token=x"}, "the token comes from the account"},
+		{"token from a file", []string{"api", "contributors", "list", "-F", "api_token=t.txt"}, "the token comes from the account"},
 		{"missing field file", []string{"api", "terms", "add", "-F", "data=nope.json"}, "--field-file data: open"},
 		{"missing upload", []string{"api", "projects", "upload", "--upload", "nope.json"}, "--upload: open"},
 	}

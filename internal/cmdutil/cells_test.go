@@ -74,3 +74,26 @@ func TestListCell(t *testing.T) {
 		})
 	}
 }
+
+func TestPercentCell(t *testing.T) {
+	tests := []struct {
+		name string
+		p    api.Percentage
+		tty  bool
+		want string
+	}{
+		{"terminal", 83.33, true, "83.33%"},
+		{"terminal, whole", 100, true, "100%"},
+		{"piped: the number", 83.33, false, "83.33"},
+		{"piped, zero", 0, false, "0"},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			ios, _, _, _ := iostreams.Test()
+			ios.SetStdoutTTY(tt.tty)
+			if got := cmdutil.PercentCell(ios, tt.p); got != tt.want {
+				t.Errorf("got %q, want %q", got, tt.want)
+			}
+		})
+	}
+}

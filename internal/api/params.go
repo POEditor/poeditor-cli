@@ -14,7 +14,8 @@ func idParam(id int) string { return strconv.Itoa(id) }
 func jsonParam(v any) string {
 	b, err := json.Marshal(v)
 	if err != nil {
-		// only called with []string and structs of []string
+		// only called with []string, structs of []string and TranslationRow
+		// lists, which always encode
 		panic(err)
 	}
 	return string(b)

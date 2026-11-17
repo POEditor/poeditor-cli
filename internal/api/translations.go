@@ -7,6 +7,21 @@ import (
 	"fmt"
 )
 
+// TranslationRow is one translation to write: the term it belongs to and its
+// text (languages/update; later translations/add and update). The server
+// skips a row without a term (ApiV2_Languages_Update::isUserSentDataValid).
+type TranslationRow struct {
+	TermKey
+	Translation TranslationText `json:"translation"`
+}
+
+// TranslationText is the translation of a TranslationRow
+// (server: getTranslationFromRow, getFuzzyFromRow).
+type TranslationText struct {
+	Content Content `json:"content"`
+	Fuzzy   int     `json:"fuzzy"` // 0/1
+}
+
 // Translation is a term's text in one language: terms/list "translation"
 // (server: ApiV2_Terms_List::populateTranslationArray).
 type Translation struct {

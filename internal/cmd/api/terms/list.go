@@ -1,8 +1,6 @@
 package terms
 
 import (
-	"context"
-	"errors"
 	"fmt"
 	"strconv"
 	"strings"
@@ -45,7 +43,7 @@ everything, in the API's shape.`,
 			}
 			terms, err := p.Client.TermsList(cmd.Context(), p.ID, language)
 			if err != nil {
-				return languageError(cmd.Context(), p, language, err)
+				return p.LanguageError(cmd.Context(), "--language "+language, err)
 			}
 			if asJSON {
 				return cmdutil.PrintJSON(f.IO, termsJSON(terms))
@@ -58,27 +56,6 @@ everything, in the API's shape.`,
 	cmd.Flags().StringVarP(&language, "language", "l", "", "Add each term's translation in this `language` (its code, e.g. fr)")
 	cmdutil.AddJSONFlag(cmd, &asJSON)
 	return cmd
-}
-
-// languageError explains a wrong --language; any other error is returned
-// as it is. Only then are the project's languages fetched, so a correct
-// call costs one request.
-func languageError(ctx context.Context, p projectflag.Project, language string, err error) error {
-	var apiErr *api.Error
-	if !errors.As(err, &apiErr) {
-		return err
-	}
-	switch apiErr.Code {
-	case api.CodeUnknownLanguage:
-		return fmt.Errorf("--language %s: not a language code POEditor knows (e.g. en, fr, pt-br)", language)
-	case api.CodeLanguageNotInProject:
-		codes, listErr := p.Client.LanguageCodes(ctx, p.ID)
-		if listErr != nil || len(codes) == 0 {
-			return fmt.Errorf("--language %s: project %s has no such language", language, p.Label)
-		}
-		return fmt.Errorf("--language %s: project %s has no such language (it has: %s)", language, p.Label, strings.Join(codes, ", "))
-	}
-	return err
 }
 
 func printTerms(f *cmdutil.Factory, p projectflag.Project, terms []api.Term, withTranslation bool) error {

@@ -147,7 +147,7 @@ func TestList_languageErrors(t *testing.T) {
 		{"not in the project, the list fails too", api.CodeLanguageNotInProject, nil,
 			"--language xx: project 7717 has no such language"},
 		{"unknown code", api.CodeUnknownLanguage, nil,
-			"--language xx: not a language code POEditor knows (e.g. en, fr, pt-br)"},
+			"--language xx: not a language code POEditor knows (e.g. en, fr, pt-br; all of them: `poeditor api languages available`)"},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {

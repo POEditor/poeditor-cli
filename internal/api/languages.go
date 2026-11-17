@@ -2,8 +2,17 @@ package api
 
 import (
 	"context"
+	"errors"
 	"net/url"
 	"sort"
+)
+
+// Error codes of the language parameter (server: ApiV2::getProjectLanguage,
+// ApiV2_Languages::getLanguageByCode, Project::addNewLanguage).
+const (
+	CodeUnknownLanguage      = "4043" // not a language code POEditor knows
+	CodeLanguageNotInProject = "4044"
+	CodeLanguageInProject    = "4050" // languages/add: already there
 )
 
 // LanguageRef names a language wherever the API nests one: languages/available,
@@ -14,13 +23,12 @@ type LanguageRef struct {
 }
 
 // Language is a project language: one entry of languages/list
-// (server: ApiV2_Languages_List::generateLanguageArray). Not decoded yet:
-// "percentage" (ProjectStats::getProgressPercentage may return
-// float|int|string, so it needs a tolerant type before a command uses it)
-// and "updated".
+// (server: ApiV2_Languages_List::prepareLanguageResponse).
 type Language struct {
 	LanguageRef
-	Translations int `json:"translations"` // translated terms (intval)
+	Translations int        `json:"translations"` // translated terms (intval)
+	Percentage   Percentage `json:"percentage"`   // translated share of the terms
+	Updated      Time       `json:"updated"`      // last translation added; zero when none
 }
 
 // LanguagesList calls languages/list: the languages of a project.
@@ -30,6 +38,19 @@ func (c *Client) LanguagesList(ctx context.Context, projectID int) ([]Language, 
 	}
 	params := url.Values{"id": {idParam(projectID)}}
 	if err := c.post(ctx, "languages/list", params, &result); err != nil {
+		return nil, err
+	}
+	return result.Languages, nil
+}
+
+// LanguagesAvailable calls languages/available: every language POEditor
+// offers to the account, its own custom languages included
+// (server: ApiV2_Languages_Available, IsoLanguages::findAllByUser).
+func (c *Client) LanguagesAvailable(ctx context.Context) ([]LanguageRef, error) {
+	var result struct {
+		Languages []LanguageRef `json:"languages"`
+	}
+	if err := c.post(ctx, "languages/available", url.Values{}, &result); err != nil {
 		return nil, err
 	}
 	return result.Languages, nil
@@ -47,4 +68,45 @@ func (c *Client) LanguageCodes(ctx context.Context, projectID int) ([]string, er
 	}
 	sort.Strings(codes)
 	return codes, nil
+}
+
+// LanguagesAdd calls languages/add: adds one language to a project. A
+// language already in the project is an *Error with CodeLanguageInProject.
+func (c *Client) LanguagesAdd(ctx context.Context, projectID int, code string) error {
+	return c.post(ctx, "languages/add", languageParams(projectID, code), nil)
+}
+
+// LanguagesDelete calls languages/delete: removes a language from a
+// project, with all its translations.
+func (c *Client) LanguagesDelete(ctx context.Context, projectID int, code string) error {
+	return c.post(ctx, "languages/delete", languageParams(projectID, code), nil)
+}
+
+// LanguageUpdateOptions are languages/update's optional parameters.
+type LanguageUpdateOptions struct {
+	// FuzzyTrigger marks the translations of the other languages fuzzy
+	// where this update added or changed one (fuzzy_trigger).
+	FuzzyTrigger bool
+}
+
+// LanguagesUpdate calls languages/update: writes the translations of one
+// language, overwriting existing ones (server: ApiV2_Languages_Update,
+// import type import_def). The result counts are in Stats.Translations.
+// Rows must not be empty: the server takes an empty list for invalid data.
+func (c *Client) LanguagesUpdate(ctx context.Context, projectID int, code string, rows []TranslationRow, opts LanguageUpdateOptions) (Stats, error) {
+	if len(rows) == 0 {
+		return Stats{}, errors.New("languages/update: no translations to send")
+	}
+	params := languageParams(projectID, code)
+	params.Set("data", jsonParam(rows))
+	if opts.FuzzyTrigger {
+		params.Set("fuzzy_trigger", "1")
+	}
+	var result Stats
+	err := c.post(ctx, "languages/update", params, &result)
+	return result, err
+}
+
+func languageParams(projectID int, code string) url.Values {
+	return url.Values{"id": {idParam(projectID)}, "language": {code}}
 }

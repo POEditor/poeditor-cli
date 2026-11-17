@@ -1,0 +1,14 @@
+[
+  {
+    "code": "en",
+    "name": "English"
+  },
+  {
+    "code": "pt-br",
+    "name": "Portuguese (BR)"
+  },
+  {
+    "code": "x-tlh",
+    "name": "Klingon (custom)"
+  }
+]

@@ -7,6 +7,7 @@ package api
 import (
 	"github.com/spf13/cobra"
 
+	"github.com/POEditor/poeditor-cli/internal/cmd/api/languages"
 	"github.com/POEditor/poeditor-cli/internal/cmd/api/projects"
 	"github.com/POEditor/poeditor-cli/internal/cmd/api/pull"
 	"github.com/POEditor/poeditor-cli/internal/cmd/api/push"
@@ -43,8 +44,8 @@ as flags named after them (--id 7717), the result printed as a generic table
 or JSON; see their --help.`
 	cmd.Example = `  poeditor api projects list
   poeditor api terms list --project web --language fr
-  poeditor api languages list --id 7717`
-	must(cmdutil.AddUnique(cmd, projects.NewCmdProjects(f), terms.NewCmdTerms(f)))
+  poeditor api contributors list --id 7717`
+	must(cmdutil.AddUnique(cmd, projects.NewCmdProjects(f), languages.NewCmdLanguages(f), terms.NewCmdTerms(f)))
 	must(raw.AddEndpoints(f, cmd))
 	return cmd
 }

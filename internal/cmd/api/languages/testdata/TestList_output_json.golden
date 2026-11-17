@@ -1,0 +1,30 @@
+[
+  {
+    "code": "fr",
+    "name": "French",
+    "translations": 10,
+    "percentage": 83.33,
+    "updated": "2026-03-01T08:00:00+0000"
+  },
+  {
+    "code": "de",
+    "name": "German",
+    "translations": 12,
+    "percentage": 100,
+    "updated": "2026-02-11T10:15:00+0000"
+  },
+  {
+    "code": "pt-br",
+    "name": "Portuguese (BR)",
+    "translations": 6,
+    "percentage": 50,
+    "updated": "2026-01-14T09:12:44+0000"
+  },
+  {
+    "code": "ro",
+    "name": "Romanian",
+    "translations": 0,
+    "percentage": 0,
+    "updated": ""
+  }
+]

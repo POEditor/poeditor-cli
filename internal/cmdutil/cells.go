@@ -61,3 +61,12 @@ func ListCell(ios *iostreams.IOStreams, values []string) string {
 	_ = enc.Encode(values) // strings always encode
 	return strings.TrimSuffix(b.String(), "\n")
 }
+
+// PercentCell is a percentage as a table cell: 83.33% on a terminal; piped,
+// the number alone (83.33), as the API sends it.
+func PercentCell(ios *iostreams.IOStreams, p api.Percentage) string {
+	if ios.IsStdoutTTY() {
+		return p.String()
+	}
+	return strings.TrimSuffix(p.String(), "%")
+}

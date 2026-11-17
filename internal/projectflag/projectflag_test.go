@@ -2,6 +2,7 @@ package projectflag_test
 
 import (
 	"bytes"
+	"strconv"
 	"strings"
 	"testing"
 
@@ -9,6 +10,7 @@ import (
 	"github.com/POEditor/poeditor-cli/internal/cmdutil"
 	"github.com/POEditor/poeditor-cli/internal/iostreams"
 	"github.com/POEditor/poeditor-cli/internal/projectflag"
+	"github.com/POEditor/poeditor-cli/internal/repoconfig"
 	"github.com/POEditor/poeditor-cli/internal/testutil"
 )
 
@@ -72,6 +74,13 @@ func TestResolve(t *testing.T) {
 			}
 			if p.ID != tt.wantID || p.Label != tt.wantLabel || p.Account != tt.wantAccount || p.Client == nil {
 				t.Errorf("got id %d, label %q, account %q; want %d, %q, %q", p.ID, p.Label, p.Account, tt.wantID, tt.wantLabel, tt.wantAccount)
+			}
+			wantRef := repoconfig.ProjectRef{ID: tt.wantID}
+			if tt.wantLabel != strconv.Itoa(tt.wantID) {
+				wantRef.Alias = tt.wantLabel
+			}
+			if p.Ref != wantRef {
+				t.Errorf("ref = %+v, want %+v", p.Ref, wantRef)
 			}
 		})
 	}

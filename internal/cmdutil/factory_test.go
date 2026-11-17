@@ -3,6 +3,8 @@ package cmdutil_test
 import (
 	"context"
 	"errors"
+	"os"
+	"path/filepath"
 	"testing"
 	"time"
 
@@ -10,6 +12,7 @@ import (
 	"github.com/POEditor/poeditor-cli/internal/api"
 	"github.com/POEditor/poeditor-cli/internal/cmdutil"
 	"github.com/POEditor/poeditor-cli/internal/config"
+	"github.com/POEditor/poeditor-cli/internal/iostreams"
 	"github.com/POEditor/poeditor-cli/internal/keyring"
 )
 
@@ -139,5 +142,29 @@ func TestSleep(t *testing.T) {
 	}
 	if time.Since(start) > time.Second {
 		t.Error("a cancelled sleep must return at once")
+	}
+}
+
+func TestReadFile(t *testing.T) {
+	dir := t.TempDir()
+	if err := os.WriteFile(filepath.Join(dir, "a.json"), []byte("from file"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	ios, stdin, _, _ := iostreams.Test()
+	stdin.WriteString("from stdin")
+	f := &cmdutil.Factory{IO: ios, WorkDir: dir}
+
+	for path, want := range map[string]string{
+		"a.json":                     "from file", // relative to the working directory
+		filepath.Join(dir, "a.json"): "from file",
+		"-":                          "from stdin",
+	} {
+		got, err := f.ReadFile(path)
+		if err != nil || string(got) != want {
+			t.Errorf("ReadFile(%q) = %q, %v; want %q", path, got, err, want)
+		}
+	}
+	if _, err := f.ReadFile("missing.json"); !errors.Is(err, os.ErrNotExist) {
+		t.Errorf("missing file: err = %v", err)
 	}
 }

@@ -5,12 +5,6 @@ import (
 	"net/url"
 )
 
-// Error codes of the language parameter (server: ApiV2::getProjectLanguage).
-const (
-	CodeUnknownLanguage      = "4043" // not a language code POEditor knows
-	CodeLanguageNotInProject = "4044"
-)
-
 // TermKey is a term's identity: its text and its context ("" when it has
 // none). Endpoints that change a term find it by both
 // (server: ApiV2_TermsHelper::findTerm).

@@ -1,5 +1,5 @@
 // Package raw gives every API v2 endpoint that has no dedicated command yet
-// a command of its own under `poeditor api` (`poeditor api languages list
+// a command of its own under `poeditor api` (`poeditor api contributors list
 // --id 7717`): it sends the request with the account's token and prints the
 // response. When an endpoint gets its dedicated command, that command takes
 // its place, so each endpoint is always exactly one command.
@@ -10,9 +10,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
-	"io"
 	"net/url"
-	"os"
 	"path/filepath"
 	"strings"
 
@@ -156,7 +154,7 @@ response is printed first).`,
 			}
 			if destructive[endpoint] && !yes {
 				return fmt.Errorf("%s deletes data and cannot be undone; nothing was sent. To send it, run:\n  %s %s --yes",
-					endpoint, cmd.CommandPath(), shellJoin(args))
+					endpoint, cmd.CommandPath(), cmdutil.ShellJoin(args))
 			}
 			client, err := f.APIClient()
 			if err != nil {
@@ -198,19 +196,6 @@ response is printed first).`,
 	return cmd
 }
 
-// shellJoin writes args back as a command line to copy, quoting what the
-// shell would split or expand.
-func shellJoin(args []string) string {
-	quoted := make([]string, len(args))
-	for i, arg := range args {
-		if arg == "" || strings.ContainsAny(arg, " \t\n'\"\\$`|&;<>()*?[]{}~#!") {
-			arg = "'" + strings.ReplaceAll(arg, "'", `'\''`) + "'"
-		}
-		quoted[i] = arg
-	}
-	return strings.Join(quoted, " ")
-}
-
 // buildRequest checks the arguments and reads the files; it makes no API call.
 // params are the --name value parameters; --field and --field-file add to them.
 func buildRequest(f *cmdutil.Factory, endpoint string, params url.Values, fields, fileFields []string, upload string) (request, error) {
@@ -228,7 +213,7 @@ func buildRequest(f *cmdutil.Factory, endpoint string, params url.Values, fields
 		if err != nil {
 			return req, err
 		}
-		data, err := readFile(f, path)
+		data, err := f.ReadFile(path)
 		if err != nil {
 			return req, fmt.Errorf("--field-file %s: %w", key, err)
 		}
@@ -236,7 +221,7 @@ func buildRequest(f *cmdutil.Factory, endpoint string, params url.Values, fields
 	}
 
 	if upload != "" {
-		data, err := readFile(f, upload)
+		data, err := f.ReadFile(upload)
 		if err != nil {
 			return req, fmt.Errorf("--upload: %w", err)
 		}
@@ -253,21 +238,6 @@ func splitField(flag, field string) (string, string, error) {
 	}
 	key, err := paramName(flag+" "+key, key)
 	return key, value, err
-}
-
-// readFile reads path (relative to the working directory), or stdin for "-".
-func readFile(f *cmdutil.Factory, path string) ([]byte, error) {
-	if path == "-" {
-		return io.ReadAll(f.IO.In)
-	}
-	if !filepath.IsAbs(path) {
-		dir, err := f.WorkingDir()
-		if err != nil {
-			return nil, err
-		}
-		path = filepath.Join(dir, path)
-	}
-	return os.ReadFile(path)
 }
 
 // printJSON indents raw JSON as received (key order kept, strings readable);
