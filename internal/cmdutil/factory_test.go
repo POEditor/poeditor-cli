@@ -168,3 +168,15 @@ func TestReadFile(t *testing.T) {
 		t.Errorf("missing file: err = %v", err)
 	}
 }
+
+func TestResolvePath(t *testing.T) {
+	dir := t.TempDir()
+	f := &cmdutil.Factory{WorkDir: dir}
+	abs := filepath.Join(dir, "x", "y.po")
+
+	for in, want := range map[string]string{"locales/fr.po": filepath.Join(dir, "locales", "fr.po"), abs: abs} {
+		if got, err := f.ResolvePath(in); err != nil || got != want {
+			t.Errorf("ResolvePath(%q) = %q, %v; want %q", in, got, err, want)
+		}
+	}
+}

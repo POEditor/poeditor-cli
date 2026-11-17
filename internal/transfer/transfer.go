@@ -1,6 +1,7 @@
 // Package transfer is what pull and push share: loading .poeditor.yml,
-// deciding which project × file × language to transfer, and the JSON shape
-// of the per-file results.
+// deciding which project × file × language to transfer, the JSON shape of
+// the per-file results, and — with `poeditor api projects export|upload` —
+// the export and upload calls themselves (api.go) and the atomic write.
 package transfer
 
 import (

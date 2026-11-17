@@ -36,6 +36,8 @@ type ProjectDetails struct {
 	ReferenceLanguage string `json:"reference_language"` // code, or ""
 	FallbackLanguage  string `json:"fallback_language"`  // code, or ""
 	Terms             int    `json:"terms"`
+	TermsLastAdded    Time   `json:"terms_last_added"`   // zero without terms
+	TermsLastUpdated  Time   `json:"terms_last_updated"` // zero without terms
 }
 
 // ProjectsView calls projects/view: one project's details.
@@ -46,6 +48,81 @@ func (c *Client) ProjectsView(ctx context.Context, projectID int) (ProjectDetail
 	params := url.Values{"id": {idParam(projectID)}}
 	err := c.post(ctx, "projects/view", params, &result)
 	return result.Project, err
+}
+
+// ProjectsAdd calls projects/add: creates a project owned by the account.
+func (c *Client) ProjectsAdd(ctx context.Context, name, description string) (ProjectDetails, error) {
+	params := url.Values{"name": {name}}
+	if description != "" {
+		params.Set("description", description)
+	}
+	var result struct {
+		Project ProjectDetails `json:"project"`
+	}
+	err := c.post(ctx, "projects/add", params, &result)
+	return result.Project, err
+}
+
+// ProjectUpdate is what projects/update changes; a nil field keeps its
+// value (server: ApiV2_Projects_Update::prepareRequestParams). "" clears a
+// language. The server ignores a language code it does not know, so check
+// codes before calling.
+type ProjectUpdate struct {
+	Name              *string
+	Description       *string
+	ReferenceLanguage *string
+	FallbackLanguage  *string
+	Proofreading      *bool
+	LockProofread     *bool // proofread translations can't be changed by contributors
+}
+
+// IsZero reports an update that changes nothing.
+func (u ProjectUpdate) IsZero() bool { return u == ProjectUpdate{} }
+
+// ProjectsUpdate calls projects/update and returns the project as it is
+// now (the proofreading settings are not part of it).
+func (c *Client) ProjectsUpdate(ctx context.Context, projectID int, u ProjectUpdate) (ProjectDetails, error) {
+	params := url.Values{"id": {idParam(projectID)}}
+	for name, v := range map[string]*string{
+		"name": u.Name, "description": u.Description,
+		"reference_language": u.ReferenceLanguage, "fallback_language": u.FallbackLanguage,
+	} {
+		if v != nil {
+			params.Set(name, *v)
+		}
+	}
+	for name, v := range map[string]*bool{"proofreading": u.Proofreading, "lock_proofread": u.LockProofread} {
+		if v != nil {
+			params.Set(name, boolParam(*v))
+		}
+	}
+	var result struct {
+		Project ProjectDetails `json:"project"`
+	}
+	err := c.post(ctx, "projects/update", params, &result)
+	return result.Project, err
+}
+
+// ProjectsDelete calls projects/delete: deletes a project the account owns,
+// with everything in it.
+func (c *Client) ProjectsDelete(ctx context.Context, projectID int) error {
+	return c.post(ctx, "projects/delete", url.Values{"id": {idParam(projectID)}}, nil)
+}
+
+// ProjectsSync calls projects/sync: the project's terms become exactly
+// terms: new ones are added, existing ones updated (reference, plural,
+// tags, comment), and every other term is DELETED with its translations.
+// The server deletes before it checks the rows, so a list whose rows all
+// lack a term would empty the project: check every row (TermKey.Check)
+// before calling. The counts are Stats.Terms: parsed, added, updated,
+// deleted.
+func (c *Client) ProjectsSync(ctx context.Context, projectID int, terms []NewTerm) (Stats, error) {
+	for _, t := range terms {
+		if err := t.TermKey.Check(); err != nil {
+			return Stats{}, errors.New("projects/sync: a term without text would delete every term; nothing was sent")
+		}
+	}
+	return c.postRows(ctx, "projects/sync", projectID, terms, len(terms), nil)
 }
 
 // ExportOptions are the projects/export parameters besides the project id.
@@ -136,7 +213,9 @@ func (o UploadOptions) values(projectID int) url.Values {
 	params := url.Values{
 		"id":       {idParam(projectID)},
 		"updating": {o.Updating},
-		"language": {o.Language},
+	}
+	if o.Language != "" {
+		params.Set("language", o.Language) // not needed with updating=terms
 	}
 	for name, on := range map[string]bool{
 		"overwrite":        o.Overwrite,

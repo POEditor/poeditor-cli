@@ -163,12 +163,22 @@ func (f *Factory) ReadFile(path string) ([]byte, error) {
 	if path == "-" {
 		return io.ReadAll(f.IO.In)
 	}
-	if !filepath.IsAbs(path) {
-		dir, err := f.WorkingDir()
-		if err != nil {
-			return nil, err
-		}
-		path = filepath.Join(dir, path)
+	path, err := f.ResolvePath(path)
+	if err != nil {
+		return nil, err
 	}
 	return os.ReadFile(path)
+}
+
+// ResolvePath is a path named on the command line, relative to the working
+// directory.
+func (f *Factory) ResolvePath(path string) (string, error) {
+	if filepath.IsAbs(path) {
+		return path, nil
+	}
+	dir, err := f.WorkingDir()
+	if err != nil {
+		return "", err
+	}
+	return filepath.Join(dir, path), nil
 }

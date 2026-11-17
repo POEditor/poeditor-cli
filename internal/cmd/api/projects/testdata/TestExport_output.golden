@@ -1,0 +1,11 @@
+{
+  "project": {
+    "id": 7717,
+    "alias": "web"
+  },
+  "language": "fr",
+  "format": "po",
+  "url": "<url>",
+  "file": "locales/fr.po",
+  "status": "unchanged"
+}

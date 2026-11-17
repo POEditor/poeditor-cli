@@ -78,3 +78,22 @@ func TestReadJSONList_missingFileAndStdin(t *testing.T) {
 		t.Errorf("stdin: %+v, %v", got, err)
 	}
 }
+
+// A file named by an argument: errors start with its path.
+func TestReadJSONFile_argument(t *testing.T) {
+	dir := t.TempDir()
+	if err := os.WriteFile(filepath.Join(dir, "terms.json"), []byte(`[{"name":"a"},{}]`), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	ios, _, _, _ := iostreams.Test()
+	f := &cmdutil.Factory{IO: ios, WorkDir: dir}
+
+	_, err := cmdutil.ReadJSONFile(f, "", "terms.json", needsName)
+	if err == nil || err.Error() != `terms.json: entry 2: no "name"` {
+		t.Errorf("error = %v", err)
+	}
+	_, err = cmdutil.ReadJSONFile[item](f, "", "nope.json", nil)
+	if !errors.Is(err, os.ErrNotExist) || strings.HasPrefix(err.Error(), "--from-file") {
+		t.Errorf("missing: %v", err)
+	}
+}

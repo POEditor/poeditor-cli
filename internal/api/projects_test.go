@@ -73,7 +73,8 @@ func TestProjectsList(t *testing.T) {
 
 func TestProjectsView(t *testing.T) {
 	var rec recorder
-	client := rec.client(t, `{"project":{"id":7717,"name":"Web","reference_language":"en","fallback_language":"","terms":12}}`)
+	client := rec.client(t, `{"project":{"id":7717,"name":"Web","reference_language":"en","fallback_language":"","terms":12,`+
+		`"terms_last_added":"2026-03-01T08:00:00+0000","terms_last_updated":""}}`)
 
 	p, err := client.ProjectsView(context.Background(), 7717)
 
@@ -81,7 +82,8 @@ func TestProjectsView(t *testing.T) {
 		t.Fatal(err)
 	}
 	rec.assertForm(t, "projects/view", url.Values{"id": {"7717"}})
-	if p.ID != 7717 || p.Name != "Web" || p.ReferenceLanguage != "en" || p.Terms != 12 {
+	added, _ := api.ParseTime("2026-03-01T08:00:00+0000")
+	if p.ID != 7717 || p.Name != "Web" || p.ReferenceLanguage != "en" || p.Terms != 12 || p.TermsLastAdded != added || !p.TermsLastUpdated.IsZero() {
 		t.Errorf("project = %+v", p)
 	}
 }
@@ -152,6 +154,11 @@ func TestProjectsUpload(t *testing.T) {
 			want: url.Values{"id": {"7717"}, "updating": {"terms_translations"}, "language": {"en"}},
 		},
 		{
+			name: "terms only: no language",
+			opts: api.UploadOptions{Updating: "terms"},
+			want: url.Values{"id": {"7717"}, "updating": {"terms"}},
+		},
+		{
 			name: "every option",
 			opts: api.UploadOptions{Updating: "translations", Language: "fr", Overwrite: true, SyncTerms: true,
 				ReadFromSource: true, FuzzyTrigger: true,
@@ -208,5 +215,107 @@ func TestProjectsUpload_multiLanguageDetails(t *testing.T) {
 	want := []api.LanguageStats{{Language: api.LanguageRef{Name: "French", Code: "fr"}, Parsed: 2, Added: 1, Updated: 1}}
 	if res.Translations == nil || !reflect.DeepEqual(res.Translations.Details, want) {
 		t.Errorf("translations = %+v", res.Translations)
+	}
+}
+
+const projectResult = `{"project":{"id":7717,"name":"Web","description":"","public":0,"open":0,"reference_language":"en","fallback_language":"","terms":0,"terms_last_added":"","terms_last_updated":"","created":"2026-11-17T10:00:00+0000"}}`
+
+func TestProjectsAdd(t *testing.T) {
+	for _, tt := range []struct {
+		description string
+		want        url.Values
+	}{
+		{"", url.Values{"name": {"Web"}}},
+		{"The site", url.Values{"name": {"Web"}, "description": {"The site"}}},
+	} {
+		var rec recorder
+		client := rec.client(t, projectResult)
+
+		p, err := client.ProjectsAdd(context.Background(), "Web", tt.description)
+
+		if err != nil {
+			t.Fatal(err)
+		}
+		rec.assertForm(t, "projects/add", tt.want)
+		if p.ID != 7717 || p.Name != "Web" {
+			t.Errorf("project = %+v", p)
+		}
+	}
+}
+
+func TestProjectsUpdate(t *testing.T) {
+	name, empty := "Site", ""
+	on, off := true, false
+	tests := []struct {
+		name string
+		u    api.ProjectUpdate
+		want url.Values
+	}{
+		{"name only", api.ProjectUpdate{Name: &name}, url.Values{"name": {"Site"}}},
+		{"clear a language, switches", api.ProjectUpdate{FallbackLanguage: &empty, Proofreading: &on, LockProofread: &off},
+			url.Values{"fallback_language": {""}, "proofreading": {"1"}, "lock_proofread": {"0"}}},
+		{"everything", api.ProjectUpdate{Name: &name, Description: &empty, ReferenceLanguage: &name, FallbackLanguage: &name, Proofreading: &off, LockProofread: &on},
+			url.Values{"name": {"Site"}, "description": {""}, "reference_language": {"Site"}, "fallback_language": {"Site"}, "proofreading": {"0"}, "lock_proofread": {"1"}}},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			var rec recorder
+			client := rec.client(t, projectResult)
+
+			if _, err := client.ProjectsUpdate(context.Background(), 7717, tt.u); err != nil {
+				t.Fatal(err)
+			}
+			want := url.Values{"id": {"7717"}}
+			for k, v := range tt.want {
+				want[k] = v
+			}
+			rec.assertForm(t, "projects/update", want)
+		})
+	}
+	if !(api.ProjectUpdate{}).IsZero() || (api.ProjectUpdate{Proofreading: &off}).IsZero() {
+		t.Error("IsZero")
+	}
+}
+
+func TestProjectsDelete(t *testing.T) {
+	var rec recorder
+	client := rec.client(t, `null`)
+
+	if err := client.ProjectsDelete(context.Background(), 7717); err != nil {
+		t.Fatal(err)
+	}
+	rec.assertForm(t, "projects/delete", url.Values{"id": {"7717"}})
+}
+
+func TestProjectsSync(t *testing.T) {
+	var rec recorder
+	client := rec.client(t, `{"terms":{"parsed":2,"added":1,"updated":1,"deleted":5}}`)
+
+	stats, err := client.ProjectsSync(context.Background(), 7717, []api.NewTerm{
+		{TermKey: api.TermKey{Term: "save"}, Tags: []string{"web"}}, {TermKey: api.TermKey{Term: "open", Context: "menu"}},
+	})
+
+	if err != nil {
+		t.Fatal(err)
+	}
+	rec.assertForm(t, "projects/sync", url.Values{"id": {"7717"}, "data": {`[{"term":"save","context":"","tags":["web"]},{"term":"open","context":"menu"}]`}})
+	if want := (api.TermStats{Parsed: 2, Added: 1, Updated: 1, Deleted: 5}); stats.Terms == nil || *stats.Terms != want {
+		t.Errorf("stats = %+v", stats.Terms)
+	}
+}
+
+// A row without a term would make the server delete every term: refused
+// before any request, whatever the caller checked.
+func TestProjectsSync_refusesRowsWithoutTerm(t *testing.T) {
+	for _, terms := range [][]api.NewTerm{nil, {{TermKey: api.TermKey{Context: "x"}}}, {{TermKey: api.TermKey{Term: "a"}}, {TermKey: api.TermKey{Term: " "}}}} {
+		var rec recorder
+		client := rec.client(t, `null`)
+
+		if _, err := client.ProjectsSync(context.Background(), 7717, terms); err == nil {
+			t.Errorf("%+v: no error", terms)
+		}
+		if rec.path != "" {
+			t.Errorf("%+v: a request was sent", terms)
+		}
 	}
 }

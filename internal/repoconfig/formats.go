@@ -49,7 +49,8 @@ var PullFilters = []string{
 	"proofread", "not_proofread",
 }
 
-// TagsMatchModes are the projects/export `tags_match` values.
+// TagsMatchModes are the projects/export `tags_match` values (the same as
+// api.TagsMatchModes; this layer may not import api).
 var TagsMatchModes = []string{"all", "any", "exclude"}
 
 // UpdatingModes are the projects/upload `updating` values.

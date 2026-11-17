@@ -99,11 +99,7 @@ written before it stay written.`,
 
 // pullOne exports one file in one language and writes it.
 func pullOne(cmd *cobra.Command, client *api.Client, item transfer.Item, dryRun bool) (transfer.Status, error) {
-	link, err := client.ProjectsExport(cmd.Context(), item.Project.ID, exportOptions(item))
-	if err != nil {
-		return "", err
-	}
-	data, err := client.Download(cmd.Context(), link)
+	data, err := transfer.Export(cmd.Context(), client, item.Project.ID, exportOptions(item))
 	if err != nil {
 		return "", err
 	}

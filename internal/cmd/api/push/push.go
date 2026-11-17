@@ -10,7 +10,6 @@ import (
 	"path/filepath"
 	"slices"
 	"strings"
-	"time"
 
 	"github.com/spf13/cobra"
 
@@ -18,14 +17,6 @@ import (
 	"github.com/POEditor/poeditor-cli/internal/cmdutil"
 	"github.com/POEditor/poeditor-cli/internal/repoconfig"
 	"github.com/POEditor/poeditor-cli/internal/transfer"
-)
-
-const (
-	// UploadDelay is the wait between uploads: the paid-plan limit. Free
-	// accounts (20s) get the rest through the 4048 retries.
-	UploadDelay = 10 * time.Second
-	// MaxRetries is how many times one upload is retried after 4048.
-	MaxRetries = 3
 )
 
 // Statuses.
@@ -38,32 +29,7 @@ const (
 // Result is one file in one language, as reported by --json.
 type Result struct {
 	transfer.FileResult
-	Terms        *TermCounts        `json:"terms,omitempty"`
-	Translations *TranslationCounts `json:"translations,omitempty"`
-}
-
-// TermCounts are the term counts of one upload in --json.
-type TermCounts struct {
-	Parsed  int `json:"parsed"`
-	Added   int `json:"added"`
-	Deleted int `json:"deleted"`
-}
-
-// TranslationCounts are the translation counts of one upload in --json.
-type TranslationCounts struct {
-	Parsed  int `json:"parsed"`
-	Added   int `json:"added"`
-	Updated int `json:"updated"`
-}
-
-// setCounts copies what --json reports from the API's stats.
-func (r *Result) setCounts(s api.Stats) {
-	if t := s.Terms; t != nil {
-		r.Terms = &TermCounts{Parsed: t.Parsed, Added: t.Added, Deleted: t.Deleted}
-	}
-	if t := s.Translations; t != nil {
-		r.Translations = &TranslationCounts{Parsed: t.Parsed, Added: t.Added, Updated: t.Updated}
-	}
+	transfer.UploadCounts
 }
 
 // upload is one planned upload.
@@ -144,19 +110,19 @@ if a source file is missing or a format cannot be uploaded.`,
 						continue
 					}
 					if uploads > 0 {
-						if err := wait(cmd, f, UploadDelay, "before the next upload"); err != nil {
+						if err := transfer.Wait(cmd.Context(), f, transfer.UploadDelay, "before the next upload"); err != nil {
 							return err
 						}
 					}
-					counts, err := send(cmd, f, u, data)
+					counts, err := transfer.Upload(cmd.Context(), f, u.client, u.Project.ID, filepath.Base(u.Path), data, u.opts)
 					if err != nil {
 						return &transfer.ErrStopped{Display: u.Display, Err: err}
 					}
 					uploads++
 					res.Status = Uploaded
-					res.setCounts(counts)
+					res.UploadCounts = transfer.CountsOf(counts)
 					results = append(results, res)
-					fmt.Fprintf(f.IO.ErrOut, "%-14s %s (%s)  %s\n", "uploaded", u.Display, u.Language, describeCounts(counts))
+					fmt.Fprintf(f.IO.ErrOut, "%-14s %s (%s)  %s\n", "uploaded", u.Display, u.Language, transfer.CountsOf(counts))
 				}
 				return nil
 			}()
@@ -231,23 +197,6 @@ func makePlan(cmd *cobra.Command, f *cmdutil.Factory, cfg *repoconfig.Config, pr
 	return plan, nil
 }
 
-// send uploads one file, waiting and retrying while the API says it is too early.
-func send(cmd *cobra.Command, f *cmdutil.Factory, u upload, data []byte) (api.Stats, error) {
-	for attempt := 0; ; attempt++ {
-		counts, err := u.client.ProjectsUpload(cmd.Context(), u.Project.ID, filepath.Base(u.Path), data, u.opts)
-		var apiErr *api.Error
-		if err == nil || !errors.As(err, &apiErr) || apiErr.Code != api.CodeTooManyUploads {
-			return counts, err
-		}
-		if attempt == MaxRetries {
-			return counts, fmt.Errorf("%w (still refused after %d retries; try again in a minute)", err, MaxRetries)
-		}
-		if err := wait(cmd, f, UploadDelay, "and retrying: POEditor allows one upload every 10–20s"); err != nil {
-			return counts, err
-		}
-	}
-}
-
 // uploadOptions maps a file's `push:` block onto projects/upload. The
 // source file creates terms (terms_translations, or push.updating); every
 // other language only brings translations. sync_terms applies to the source
@@ -274,11 +223,6 @@ func uploadOptions(item transfer.Item, source bool) api.UploadOptions {
 	return opts
 }
 
-func wait(cmd *cobra.Command, f *cmdutil.Factory, d time.Duration, why string) error {
-	fmt.Fprintf(f.IO.ErrOut, "waiting %ds %s…\n", int(d.Seconds()), why)
-	return f.Sleep(cmd.Context(), d)
-}
-
 // describe is the --dry-run detail of an upload.
 func describe(u upload) string {
 	parts := []string{"updating=" + u.opts.Updating}
@@ -292,18 +236,6 @@ func describe(u upload) string {
 		parts = append(parts, "tags="+tags)
 	}
 	return strings.Join(parts, ", ")
-}
-
-// describeCounts is the stderr detail of a finished upload.
-func describeCounts(c api.Stats) string {
-	var parts []string
-	if t := c.Terms; t != nil {
-		parts = append(parts, fmt.Sprintf("terms: %d parsed, %d added, %d deleted", t.Parsed, t.Added, t.Deleted))
-	}
-	if t := c.Translations; t != nil {
-		parts = append(parts, fmt.Sprintf("translations: %d added, %d updated", t.Added, t.Updated))
-	}
-	return strings.Join(parts, " · ")
 }
 
 func summary(results []Result, dryRun bool) string {

@@ -1,0 +1,17 @@
+{
+  "project": {
+    "id": 7717,
+    "alias": "web"
+  },
+  "file": "en.json",
+  "terms": {
+    "parsed": 3,
+    "added": 2,
+    "deleted": 1
+  },
+  "translations": {
+    "parsed": 3,
+    "added": 2,
+    "updated": 1
+  }
+}

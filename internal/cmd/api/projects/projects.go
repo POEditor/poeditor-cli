@@ -10,6 +10,6 @@ import (
 // NewCmdProjects returns the `projects` command group.
 func NewCmdProjects(f *cmdutil.Factory) *cobra.Command {
 	cmd := cmdutil.NewGroup("projects <command>", "Work with POEditor projects")
-	cmd.AddCommand(NewCmdList(f))
+	cmd.AddCommand(NewCmdAdd(f), NewCmdDelete(f), NewCmdExport(f), NewCmdList(f), NewCmdSync(f), NewCmdUpdate(f), NewCmdUpload(f), NewCmdView(f))
 	return cmd
 }

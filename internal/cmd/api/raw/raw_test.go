@@ -246,7 +246,7 @@ func TestAPI_everyEndpoint(t *testing.T) {
 		ran++
 	}
 	if ran == 0 {
-		t.Fatal("no raw command found")
+		t.Skip("every endpoint has a dedicated command")
 	}
 }
 
