@@ -33,7 +33,8 @@ changelog:
   sort: asc
 
 release:
-  draft: true
+  # -rc / -beta tags are marked as pre-releases on GitHub.
+  prerelease: auto
 
 # Both repos are updated with TAP_GITHUB_TOKEN: GITHUB_TOKEN can only write to this repo.
 homebrew_casks:
@@ -43,6 +44,7 @@ homebrew_casks:
       name: homebrew-tap
       token: "{{ .Env.TAP_GITHUB_TOKEN }}"
     directory: Casks
+    skip_upload: auto # pre-release tags leave the tap alone
     homepage: https://github.com/POEditor/poeditor-cli
     description: Command-line client for POEditor
     license: MIT
@@ -63,6 +65,7 @@ scoops:
       owner: POEditor
       name: scoop-bucket
       token: "{{ .Env.TAP_GITHUB_TOKEN }}"
+    skip_upload: auto # pre-release tags leave the bucket alone
     homepage: https://github.com/POEditor/poeditor-cli
     description: Command-line client for POEditor
     license: MIT
