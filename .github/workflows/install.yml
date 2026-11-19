@@ -1,0 +1,102 @@
+# Runs install.sh / install.ps1 against a snapshot release served locally, on every OS.
+name: install
+
+on:
+  push:
+    branches: [master]
+    paths: [install.sh, install.ps1, .goreleaser.yml, .github/workflows/install.yml]
+  pull_request:
+    paths: [install.sh, install.ps1, .goreleaser.yml, .github/workflows/install.yml]
+
+permissions:
+  contents: read
+
+jobs:
+  install:
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, macos-latest, windows-latest]
+    runs-on: ${{ matrix.os }}
+    env:
+      POEDITOR_RELEASES_URL: http://127.0.0.1:8765
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - uses: actions/setup-go@v5
+        with:
+          go-version-file: go.mod
+      - uses: goreleaser/goreleaser-action@v6
+        with:
+          version: "~> v2"
+          args: release --snapshot --clean
+        env:
+          TAP_GITHUB_TOKEN: unused-in-snapshots
+
+      # Lay the snapshot out like GitHub Releases (download/<tag>/<file>) and serve it.
+      - name: serve the snapshot release
+        shell: bash
+        run: |
+          version=$(sed -n 's/.*"version":"\([^"]*\)".*/\1/p' dist/metadata.json)
+          echo "VERSION=$version" >> "$GITHUB_ENV"
+          mkdir -p "srv/download/v$version"
+          cp dist/*.tar.gz dist/*.zip dist/checksums.txt "srv/download/v$version/"
+          py=$(command -v python3 || command -v python)
+          cd srv && nohup "$py" -m http.server 8765 > ../server.log 2>&1 &
+          for i in $(seq 30); do curl -fs -o /dev/null http://127.0.0.1:8765/ && exit 0; sleep 1; done
+          cat server.log; exit 1
+
+      - name: install.sh
+        if: runner.os != 'Windows'
+        shell: bash
+        run: |
+          POEDITOR_VERSION=$VERSION POEDITOR_INSTALL_DIR="$RUNNER_TEMP/bin" sh ./install.sh
+          test "$("$RUNNER_TEMP/bin/poeditor" --version)" = "poeditor version $VERSION"
+
+      - name: install.sh refuses a tampered archive
+        if: runner.os != 'Windows'
+        shell: bash
+        run: |
+          for f in srv/download/v$VERSION/*.tar.gz; do echo x >> "$f"; done
+          if POEDITOR_VERSION=$VERSION POEDITOR_INSTALL_DIR="$RUNNER_TEMP/bad" sh ./install.sh 2> err.txt; then
+            echo "install.sh accepted a tampered archive"; exit 1
+          fi
+          cat err.txt
+          grep -q "checksum mismatch" err.txt
+          test ! -e "$RUNNER_TEMP/bad/poeditor"
+
+      # Windows PowerShell 5.1 (what `irm | iex` runs in by default) and PowerShell 7.
+      - name: install.ps1 (Windows PowerShell 5.1)
+        if: runner.os == 'Windows'
+        shell: powershell
+        run: |
+          $env:POEDITOR_VERSION = $env:VERSION
+          $env:POEDITOR_INSTALL_DIR = "$env:RUNNER_TEMP\bin51"
+          .\install.ps1
+          $got = & "$env:RUNNER_TEMP\bin51\poeditor.exe" --version
+          if ($got -ne "poeditor version $env:VERSION") { throw "got '$got'" }
+
+      - name: install.ps1 (PowerShell 7)
+        if: runner.os == 'Windows'
+        shell: pwsh
+        run: |
+          $env:POEDITOR_VERSION = $env:VERSION
+          $env:POEDITOR_INSTALL_DIR = "$env:RUNNER_TEMP\bin7"
+          .\install.ps1
+          $got = & "$env:RUNNER_TEMP\bin7\poeditor.exe" --version
+          if ($got -ne "poeditor version $env:VERSION") { throw "got '$got'" }
+
+      - name: install.ps1 refuses a tampered archive
+        if: runner.os == 'Windows'
+        shell: pwsh
+        run: |
+          Get-ChildItem "srv\download\v$env:VERSION\*.zip" | ForEach-Object { Add-Content -Path $_.FullName -Value 'x' }
+          $env:POEDITOR_VERSION = $env:VERSION
+          $env:POEDITOR_INSTALL_DIR = "$env:RUNNER_TEMP\bad"
+          $out = & pwsh -NoProfile -File .\install.ps1 2>&1 | Out-String
+          $code = $LASTEXITCODE
+          Write-Host $out
+          if ($code -eq 0) { throw "install.ps1 accepted a tampered archive" }
+          if ($out -notmatch 'checksum mismatch') { throw "expected a checksum mismatch error" }
+          if (Test-Path "$env:RUNNER_TEMP\bad\poeditor.exe") { throw "poeditor.exe was installed" }
