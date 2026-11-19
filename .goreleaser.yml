@@ -34,3 +34,38 @@ changelog:
 
 release:
   draft: true
+
+# Both repos are updated with TAP_GITHUB_TOKEN: GITHUB_TOKEN can only write to this repo.
+homebrew_casks:
+  - name: poeditor
+    repository:
+      owner: POEditor
+      name: homebrew-tap
+      token: "{{ .Env.TAP_GITHUB_TOKEN }}"
+    directory: Casks
+    homepage: https://github.com/POEditor/poeditor-cli
+    description: Command-line client for POEditor
+    license: MIT
+    commit_author:
+      name: goreleaserbot
+      email: bot@goreleaser.com
+    hooks:
+      post:
+        # The binaries are not notarized yet; without this macOS refuses to run them.
+        install_steps: |
+          on_macos do
+            run "/usr/bin/xattr", args: ["-dr", "com.apple.quarantine", "{{ .StagedPath }}/poeditor"]
+          end
+
+scoops:
+  - name: poeditor
+    repository:
+      owner: POEditor
+      name: scoop-bucket
+      token: "{{ .Env.TAP_GITHUB_TOKEN }}"
+    homepage: https://github.com/POEditor/poeditor-cli
+    description: Command-line client for POEditor
+    license: MIT
+    commit_author:
+      name: goreleaserbot
+      email: bot@goreleaser.com
