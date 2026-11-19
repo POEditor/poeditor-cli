@@ -16,6 +16,9 @@ import (
 	"github.com/POEditor/poeditor-cli/internal/keyring"
 )
 
+// overrideURL is any non-production API URL, used to check the base-URL override.
+const overrideURL = "https://api.example.test/v2/"
+
 func factory(t *testing.T, env map[string]string) *cmdutil.Factory {
 	t.Helper()
 	return &cmdutil.Factory{
@@ -57,7 +60,7 @@ func TestAPIClient_usesResolvedAccount(t *testing.T) {
 func TestAPIClientWithToken_baseURL(t *testing.T) {
 	tests := []struct{ name, baseURL, want string }{
 		{"production by default", "", api.DefaultBaseURL},
-		{"override", "https://api.poeditor.loc/v2/", "https://api.poeditor.loc/v2/"},
+		{"override", overrideURL, overrideURL},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
@@ -74,9 +77,9 @@ func TestAPIClientWithToken_baseURL(t *testing.T) {
 }
 
 func TestNew_readsAPIURLFromEnv(t *testing.T) {
-	t.Setenv("POEDITOR_API_URL", "https://api.poeditor.lan/v2/")
+	t.Setenv("POEDITOR_API_URL", overrideURL)
 
-	if got := cmdutil.New().BaseURL; got != "https://api.poeditor.lan/v2/" {
+	if got := cmdutil.New().BaseURL; got != overrideURL {
 		t.Errorf("BaseURL = %q", got)
 	}
 }
