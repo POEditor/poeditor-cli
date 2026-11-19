@@ -37,7 +37,20 @@ unchanged      locales/en.json
 
 ## Install
 
-macOS and Linux:
+Homebrew (macOS and Linux):
+
+```sh
+brew install poeditor/tap/poeditor
+```
+
+Scoop (Windows):
+
+```powershell
+scoop bucket add poeditor https://github.com/POEditor/scoop-bucket
+scoop install poeditor
+```
+
+Without a package manager, on macOS and Linux:
 
 ```sh
 curl -fsSL https://raw.githubusercontent.com/POEditor/poeditor-cli/master/install.sh | sh
