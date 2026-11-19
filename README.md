@@ -156,10 +156,18 @@ account) and run the command.
 
 ```yaml
 # GitHub Actions
+- name: install poeditor
+  run: |
+    curl -fsSL https://raw.githubusercontent.com/POEditor/poeditor-cli/master/install.sh | POEDITOR_INSTALL_DIR="$HOME/.local/bin" sh
+    echo "$HOME/.local/bin" >> "$GITHUB_PATH"
 - run: poeditor config check && poeditor pull
   env:
     POEDITOR_TOKEN: ${{ secrets.POEDITOR_TOKEN }}
 ```
+
+Setting `POEDITOR_INSTALL_DIR` and adding it to `$GITHUB_PATH` makes `poeditor` available to
+the later steps. To pin a release, so a new one can't change your build unannounced, add
+`POEDITOR_VERSION=v0.1.0` next to `POEDITOR_INSTALL_DIR`.
 
 `poeditor config check` exits with an error when `.poeditor.yml` points at a project,
 language or account that does not exist. A read-only token is enough for `pull`. More in
