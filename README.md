@@ -37,7 +37,23 @@ unchanged      locales/en.json
 
 ## Install
 
-Download the binary for your platform from the
+macOS and Linux:
+
+```sh
+curl -fsSL https://raw.githubusercontent.com/POEditor/poeditor-cli/master/install.sh | sh
+```
+
+Windows (PowerShell):
+
+```powershell
+irm https://raw.githubusercontent.com/POEditor/poeditor-cli/master/install.ps1 | iex
+```
+
+The scripts install the latest release after checking it against the release's checksums. Set
+`POEDITOR_VERSION` (e.g. `v0.1.0`) to install another release, and `POEDITOR_INSTALL_DIR` to
+choose where the binary goes.
+
+Or download the archive for your platform from the
 [latest release](https://github.com/POEditor/poeditor-cli/releases/latest), unpack it and put
 `poeditor` somewhere on your `PATH`.
 
