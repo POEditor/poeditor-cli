@@ -2,6 +2,7 @@ package projects_test
 
 import (
 	"errors"
+	"io/fs"
 	"net/url"
 	"strings"
 	"testing"
@@ -107,6 +108,21 @@ func TestUpload_syncNeedsYes(t *testing.T) {
 	}
 }
 
+// The OS words "file not found" differently (Windows: "The system cannot find the file
+// specified."), so the test checks the error's kind and the file name, not the wording.
+func TestUpload_missingFile(t *testing.T) {
+	fake := testutil.NewFakeAPI(t)
+
+	res := env(t, fake).Run("api", "projects", "upload", "nope.json", "-p", "web", "--updating", "terms")
+
+	if !errors.Is(res.Err, fs.ErrNotExist) || !strings.Contains(res.Err.Error(), "nope.json") {
+		t.Errorf("error = %v, want a not-found error naming nope.json", res.Err)
+	}
+	if n := len(fake.Requests()); n != 0 {
+		t.Errorf("%d requests", n)
+	}
+}
+
 func TestUpload_badInput(t *testing.T) {
 	tests := []struct {
 		name string
@@ -117,7 +133,6 @@ func TestUpload_badInput(t *testing.T) {
 		{"a bad --updating", []string{"en.json", "-p", "web", "--updating", "all"}, `--updating "all": use terms, terms_translations, translations`},
 		{"translations need a language", []string{"en.json", "-p", "web", "--updating", "translations"}, "--updating translations needs --language"},
 		{"stdin", []string{"-", "-p", "web", "--updating", "terms"}, "upload a file by its name"},
-		{"a missing file", []string{"nope.json", "-p", "web", "--updating", "terms"}, "nope.json: no such file"},
 		{"no file", []string{"-p", "web", "--updating", "terms"}, "accepts 1 arg(s), received 0"},
 		{"no project", []string{"en.json", "--updating", "terms"}, `required flag "--project" not set`},
 	}

@@ -71,6 +71,7 @@ func TestShow(t *testing.T) {
 		}
 		got := strings.ReplaceAll(res.Stdout, env.WorkDir, "<repo>")
 		got = strings.ReplaceAll(got, strings.ReplaceAll(env.WorkDir, `\`, `\\`), "<repo>") // Windows paths in JSON
+		got = strings.ReplaceAll(got, `<repo>\\`, "<repo>/")                                // and the separator after it
 		testutil.Golden(t, got)
 	})
 
