@@ -94,9 +94,10 @@ jobs:
           Get-ChildItem "srv\download\v$env:VERSION\*.zip" | ForEach-Object { Add-Content -Path $_.FullName -Value 'x' }
           $env:POEDITOR_VERSION = $env:VERSION
           $env:POEDITOR_INSTALL_DIR = "$env:RUNNER_TEMP\bad"
-          $out = & pwsh -NoProfile -File .\install.ps1 2>&1 | Out-String
-          $code = $LASTEXITCODE
-          Write-Host $out
-          if ($code -eq 0) { throw "install.ps1 accepted a tampered archive" }
-          if ($out -notmatch 'checksum mismatch') { throw "expected a checksum mismatch error" }
+          # In-process, as under `irm | iex`: the script throws and the session survives.
+          $failure = $null
+          try { .\install.ps1 } catch { $failure = $_.Exception.Message }
+          Write-Host "install.ps1 failed with: $failure"
+          if (-not $failure) { throw "install.ps1 accepted a tampered archive" }
+          if ($failure -notmatch 'checksum mismatch') { throw "expected a checksum mismatch error" }
           if (Test-Path "$env:RUNNER_TEMP\bad\poeditor.exe") { throw "poeditor.exe was installed" }
