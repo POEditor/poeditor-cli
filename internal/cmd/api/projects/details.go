@@ -1,9 +1,7 @@
 package projects
 
 import (
-	"fmt"
 	"strconv"
-	"strings"
 
 	"github.com/POEditor/poeditor-cli/internal/api"
 	"github.com/POEditor/poeditor-cli/internal/cmdutil"
@@ -33,59 +31,18 @@ func toDetailsJSON(p api.ProjectDetails) detailsJSON {
 	}
 }
 
-// printDetails shows one project, a field per line: "Label: value" on a
-// terminal; piped, "key<TAB>value" with the API's keys and date format.
+// printDetails shows one project as a one-row table, like `projects list`:
+// a header and the row on a terminal (long cells wrap, dates on two lines);
+// piped, one tab-separated line.
 func printDetails(f *cmdutil.Factory, p api.ProjectDetails) error {
-	tty := f.IO.IsStdoutTTY()
-	date := func(t api.Time) string {
-		if tty {
-			return orNone(cmdutil.TimeLine(t))
-		}
-		if t.IsZero() {
-			return ""
-		}
-		return t.Format(api.TimeLayout)
+	table := cmdutil.NewTable(f.IO, "ID", "NAME", "DESCRIPTION", "REFERENCE", "FALLBACK", "PUBLIC", "OPEN",
+		"TERMS", "T ADDED", "T UPDATED", "CREATED") // T ADDED, T UPDATED: when terms last were
+	// dates stay whole (date, time below); the text columns wrap instead
+	for _, column := range []int{8, 9, 10} {
+		table.SetMinWidth(column, len("2026-01-14"))
 	}
-	text := func(s string) string {
-		if tty {
-			return orNone(s)
-		}
-		return s
-	}
-	fields := []struct{ label, key, value string }{
-		{"ID", "id", strconv.Itoa(p.ID)},
-		{"Name", "name", p.Name},
-		{"Description", "description", text(p.Description)},
-		{"Reference language", "reference_language", text(p.ReferenceLanguage)},
-		{"Fallback language", "fallback_language", text(p.FallbackLanguage)},
-		{"Public", "public", yesNo(p.Public)},
-		{"Open", "open", yesNo(p.Open)},
-		{"Terms", "terms", strconv.Itoa(p.Terms)},
-		{"Terms last added", "terms_last_added", date(p.TermsLastAdded)},
-		{"Terms last updated", "terms_last_updated", date(p.TermsLastUpdated)},
-		{"Created", "created", date(p.Created)},
-	}
-	if !tty {
-		// the table's piped form: key<TAB>value, tabs and newlines in values escaped
-		table := cmdutil.NewTable(f.IO, "KEY", "VALUE")
-		for _, fl := range fields {
-			table.AddRow(fl.key, fl.value)
-		}
-		return table.Render()
-	}
-	for _, fl := range fields {
-		// a value of several lines (a description) stays in its column
-		value := strings.ReplaceAll(fl.value, "\n", "\n"+strings.Repeat(" ", 20))
-		if _, err := fmt.Fprintf(f.IO.Out, "%-20s%s\n", fl.label+":", value); err != nil {
-			return err
-		}
-	}
-	return nil
-}
-
-func orNone(s string) string {
-	if s == "" {
-		return "-"
-	}
-	return s
+	table.AddRow(strconv.Itoa(p.ID), p.Name, p.Description, p.ReferenceLanguage, p.FallbackLanguage,
+		yesNo(p.Public), yesNo(p.Open), strconv.Itoa(p.Terms),
+		cmdutil.TimeCell(f.IO, p.TermsLastAdded), cmdutil.TimeCell(f.IO, p.TermsLastUpdated), cmdutil.TimeCell(f.IO, p.Created))
+	return table.Render()
 }

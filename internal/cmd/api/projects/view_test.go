@@ -16,11 +16,13 @@ func TestView_output(t *testing.T) {
 		args   []string
 		result string
 		tty    bool
+		width  int // 0: not fitted
 	}{
-		{"terminal", []string{"--project", "web"}, webProject, true},
-		{"terminal_new", []string{"--id", "9001"}, newProject, true},
-		{"piped", []string{"-p", "web"}, webProject, false},
-		{"json", []string{"-p", "web", "--json"}, webProject, true},
+		{"terminal", []string{"--project", "web"}, webProject, true, 0},
+		{"terminal_narrow", []string{"--project", "web"}, webProject, true, 100},
+		{"terminal_new", []string{"--id", "9001"}, newProject, true, 0},
+		{"piped", []string{"-p", "web"}, webProject, false, 0},
+		{"json", []string{"-p", "web", "--json"}, webProject, true, 0},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
@@ -28,6 +30,7 @@ func TestView_output(t *testing.T) {
 			fake.Stub("projects/view", testutil.OK(json.RawMessage(tt.result)))
 			e := env(t, fake)
 			e.TTY = tt.tty
+			e.Width = tt.width
 
 			res := e.Run(append([]string{"api", "projects", "view"}, tt.args...)...)
 

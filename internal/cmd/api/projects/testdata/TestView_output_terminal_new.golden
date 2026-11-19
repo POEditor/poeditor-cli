@@ -1,11 +1,3 @@
-ID:                 9001
-Name:               Mobile app
-Description:        -
-Reference language: -
-Fallback language:  -
-Public:             no
-Open:               no
-Terms:              0
-Terms last added:   -
-Terms last updated: -
-Created:            2026-11-17 10:00:00
+ID    NAME        DESCRIPTION  REFERENCE  FALLBACK  PUBLIC  OPEN  TERMS  T ADDED  T UPDATED  CREATED
+9001  Mobile app                                    no      no    0                          2026-11-17
+                                                                                             10:00:00

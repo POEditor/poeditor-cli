@@ -18,8 +18,9 @@ func NewCmdView(f *cmdutil.Factory) *cobra.Command {
 		Use:   "view",
 		Short: "Show a project's details",
 		Long: `Show a project: name, description, reference and fallback languages, public
-and open flags, how many terms it has and when they last changed. Piped, one
-key<TAB>value line per field.`,
+and open flags, how many terms it has, when terms were last added and updated
+(T ADDED, T UPDATED) and when the project was created. One row, as in
+` + "`poeditor api projects list`" + `; piped, one tab-separated line.`,
 		Example: `  poeditor api projects view --project web
   poeditor api projects view -p 7717 --json`,
 		Args: cobra.NoArgs,

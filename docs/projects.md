@@ -38,26 +38,19 @@ prints the list as JSON.
 
 ## `poeditor api projects view`
 
-Show one project: name, description, reference and fallback languages, public and open flags,
-how many terms it has and when they last changed.
+Show one project, as one row: name, description, reference and fallback languages, public and
+open flags, how many terms it has, when terms were last added and updated (`T ADDED`,
+`T UPDATED`), and when the project was created.
 
 ```console
 $ poeditor api projects view --project web
-ID:                 12345
-Name:               Web
-Description:        The marketing site
-Reference language: en
-Fallback language:  -
-Public:             no
-Open:               no
-Terms:              412
-Terms last added:   2026-03-01 08:00:00
-Terms last updated: 2026-03-02 09:30:00
-Created:            2026-01-14 09:12:44
+ID     NAME  DESCRIPTION         REFERENCE  FALLBACK  PUBLIC  OPEN  TERMS  T ADDED     T UPDATED   CREATED
+12345  Web   The marketing site  en                   no      no    412    2026-03-01  2026-03-02  2026-01-14
+                                                                           08:00:00    09:30:00    09:12:44
 ```
 
-Piped, it prints one `key<TAB>value` line per field, with the API's key names. `--json` prints
-the project as JSON.
+Piped, it prints one tab-separated line, with dates in the API's format. `--json` prints the
+project as JSON.
 
 ## `poeditor api projects add`
 
