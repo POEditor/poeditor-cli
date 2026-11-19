@@ -13,9 +13,10 @@ $ProgressPreference = 'SilentlyContinue' # Invoke-WebRequest is very slow with t
 $repo = 'POEditor/poeditor-cli'
 $base = if ($env:POEDITOR_RELEASES_URL) { $env:POEDITOR_RELEASES_URL } else { "https://github.com/$repo/releases" } # overridden only by tests
 
+# throw, not exit: under `irm | iex` the script runs in the user's own session, and exit would
+# close their PowerShell window.
 function Fail($message) {
-    Write-Error "poeditor install: $message" -ErrorAction Continue
-    exit 1
+    throw "poeditor install: $message"
 }
 
 # A 32-bit PowerShell on 64-bit Windows reports x86; the real architecture is in PROCESSOR_ARCHITEW6432.
