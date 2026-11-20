@@ -27,6 +27,8 @@ projects:
         push:
           overwrite: true
           sync_terms: true
+          read_from_source: true
+          fuzzy_trigger: true
           tags: {all: [web], new: [fresh]}
       - {path: "emails/{lang}.po", format: po, languages: [fr]}
   - id: 2002
@@ -125,7 +127,7 @@ func TestPush_sourceOnlyByDefault(t *testing.T) {
 	}
 	want := url.Values{
 		"api_token": {"p-tok"}, "id": {"1001"}, "updating": {"terms_translations"}, "language": {"en"},
-		"overwrite": {"1"}, "sync_terms": {"1"}, "tags": {`{"all":["web"],"new":["fresh"]}`},
+		"overwrite": {"1"}, "sync_terms": {"1"}, "read_from_source": {"1"}, "fuzzy_trigger": {"1"}, "tags": {`{"all":["web"],"new":["fresh"]}`},
 	}
 	if !reflect.DeepEqual(reqs[0].Form, want) {
 		t.Errorf("first upload params:\n%v\nwant\n%v", reqs[0].Form, want)

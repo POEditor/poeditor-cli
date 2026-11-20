@@ -232,6 +232,12 @@ func describe(u upload) string {
 	if u.opts.SyncTerms {
 		parts = append(parts, "sync_terms")
 	}
+	if u.opts.ReadFromSource {
+		parts = append(parts, "read_from_source")
+	}
+	if u.opts.FuzzyTrigger {
+		parts = append(parts, "fuzzy_trigger")
+	}
 	if tags := u.opts.Tags.String(); tags != "" {
 		parts = append(parts, "tags="+tags)
 	}
