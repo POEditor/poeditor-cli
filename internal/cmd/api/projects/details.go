@@ -7,14 +7,15 @@ import (
 	"github.com/POEditor/poeditor-cli/internal/cmdutil"
 )
 
-// detailsJSON is a project in --json (view, add, update): the API's fields,
-// as our own type so an API change never changes our output by accident.
+// detailsJSON is a project in --json (view, add, update): the API's fields and
+// values (public, open 0/1), as our own type so an API change never changes our
+// output by accident.
 type detailsJSON struct {
 	ID                int      `json:"id"`
 	Name              string   `json:"name"`
 	Description       string   `json:"description"`
-	Public            bool     `json:"public"`
-	Open              bool     `json:"open"`
+	Public            int      `json:"public"` // 0/1, as the API sends it
+	Open              int      `json:"open"`   // 0/1
 	ReferenceLanguage string   `json:"reference_language"`
 	FallbackLanguage  string   `json:"fallback_language"`
 	Terms             int      `json:"terms"`
@@ -25,7 +26,7 @@ type detailsJSON struct {
 
 func toDetailsJSON(p api.ProjectDetails) detailsJSON {
 	return detailsJSON{
-		ID: p.ID, Name: p.Name, Description: p.Description, Public: p.Public != 0, Open: p.Open != 0,
+		ID: p.ID, Name: p.Name, Description: p.Description, Public: p.Public, Open: p.Open,
 		ReferenceLanguage: p.ReferenceLanguage, FallbackLanguage: p.FallbackLanguage, Terms: p.Terms,
 		TermsLastAdded: p.TermsLastAdded, TermsLastUpdated: p.TermsLastUpdated, Created: p.Created,
 	}
