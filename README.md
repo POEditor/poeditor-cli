@@ -142,7 +142,7 @@ own:
 
 ```sh
 poeditor api languages list --project web
-poeditor api terms list -p web --language fr --json | jq '.[] | select(.translation == null)'
+poeditor api terms list -p web --language fr --json | jq -r '.[] | select(.translation.content == "") | .term'
 ```
 
 Commands that change something report on stderr, so stdout stays clean for scripts.

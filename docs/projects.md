@@ -163,6 +163,12 @@ The counts (terms parsed, added, deleted; translations added, updated) go to std
 accepts one upload every 10 seconds (20 on free plans); when it says it is too early, the
 command waits and retries, like `push`.
 
+**Contexts in `key_value_json`.** POEditor stores a nested key's parents as the term's context,
+quoted: `{"button": {"save": "Save"}}` is the term `save` with the context `"button"`, quotes
+included. It does not match a term whose context is a plain `button` (added in the UI or with
+`poeditor api terms add --context button`): the upload adds a second `save` instead. Keep the
+terms of a `key_value_json` project coming from its files.
+
 To upload the files of `.poeditor.yml`, use [`poeditor push`](pull-push.md#poeditor-push).
 
 ## `poeditor api projects sync`
