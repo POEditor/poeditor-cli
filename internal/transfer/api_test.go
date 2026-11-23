@@ -4,7 +4,9 @@ import (
 	"bytes"
 	"context"
 	"errors"
+	"fmt"
 	"net/url"
+	"reflect"
 	"strings"
 	"testing"
 	"time"
@@ -45,12 +47,14 @@ func TestUpload_retriesWhileTooEarly(t *testing.T) {
 	tests := []struct {
 		name      string
 		refusals  int // 4048 answers before success
-		wantWaits int
+		wantWaits []time.Duration
 		wantErr   string
 	}{
-		{"at once", 0, 0, ""},
-		{"after two refusals", 2, 2, ""},
-		{"gives up", transfer.MaxRetries + 1, transfer.MaxRetries, "still refused after 3 retries"},
+		{"at once", 0, nil, ""},
+		// A refused upload restarts the server's clock (it counts every upload
+		// request), so waiting a fixed 10s never gets past a 20s limit.
+		{"after two refusals", 2, []time.Duration{10 * time.Second, 20 * time.Second}, ""},
+		{"gives up", transfer.MaxRetries + 1, []time.Duration{10 * time.Second, 20 * time.Second, 30 * time.Second}, "still refused after 3 retries"},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
@@ -77,16 +81,13 @@ func TestUpload_retriesWhileTooEarly(t *testing.T) {
 			} else if err != nil || stats.Terms == nil || stats.Terms.Added != 1 {
 				t.Errorf("stats = %+v, err = %v", stats.Terms, err)
 			}
-			if len(waits) != tt.wantWaits {
-				t.Errorf("waits = %v, want %d", waits, tt.wantWaits)
+			if !reflect.DeepEqual(waits, tt.wantWaits) {
+				t.Errorf("waits = %v, want %v", waits, tt.wantWaits)
 			}
-			for _, w := range waits {
-				if w != transfer.UploadDelay {
-					t.Errorf("waited %v", w)
+			for _, w := range tt.wantWaits {
+				if !strings.Contains(stderr.String(), fmt.Sprintf("waiting %ds and retrying", int(w.Seconds()))) {
+					t.Errorf("no %v wait in stderr = %q", w, stderr.String())
 				}
-			}
-			if n := strings.Count(stderr.String(), "waiting 10s and retrying"); n != tt.wantWaits {
-				t.Errorf("stderr = %q", stderr.String())
 			}
 		})
 	}

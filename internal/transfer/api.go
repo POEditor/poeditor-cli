@@ -18,7 +18,10 @@ const (
 	// UploadDelay is the wait between uploads: the paid-plan limit. Free
 	// accounts (20s) get the rest through the 4048 retries.
 	UploadDelay = 10 * time.Second
-	// MaxRetries is how many times one upload is retried after 4048.
+	// MaxRetries is how many times one upload is retried after 4048. The
+	// retries wait 10s, 20s, 30s: the server counts refused uploads too
+	// (ApiRequest::findPreviousUploadRequest), so each refusal restarts its
+	// clock and a fixed 10s never gets past a 20s limit.
 	MaxRetries = 3
 )
 
@@ -43,7 +46,7 @@ func Upload(ctx context.Context, f *cmdutil.Factory, client *api.Client, project
 		if attempt == MaxRetries {
 			return counts, fmt.Errorf("%w (still refused after %d retries; try again in a minute)", err, MaxRetries)
 		}
-		if err := Wait(ctx, f, UploadDelay, "and retrying: POEditor allows one upload every 10–20s"); err != nil {
+		if err := Wait(ctx, f, time.Duration(attempt+1)*UploadDelay, "and retrying: POEditor allows one upload every 10–20s"); err != nil {
 			return counts, err
 		}
 	}

@@ -207,7 +207,7 @@ func TestPush_retriesWhenTooEarly(t *testing.T) {
 	if n := len(uploads(s)); n != 3 {
 		t.Errorf("%d attempts, want 3 (two refused, one accepted)", n)
 	}
-	if !reflect.DeepEqual(env.Sleeps, []time.Duration{10 * time.Second, 10 * time.Second}) {
+	if !reflect.DeepEqual(env.Sleeps, []time.Duration{10 * time.Second, 20 * time.Second}) {
 		t.Errorf("sleeps = %v", env.Sleeps)
 	}
 	if !strings.Contains(res.Stderr, "waiting 10s and retrying: POEditor allows one upload every 10–20s…") {

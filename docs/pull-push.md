@@ -85,8 +85,8 @@ be uploaded (`mo` can't), every source file exists. If one fails, nothing is upl
 
 **Upload limits.** POEditor accepts one upload every 10 seconds (20 on free plans). Push
 uploads one file at a time, waits 10 seconds between uploads, and when POEditor says it is too
-early, waits and retries, up to 3 times. Source files go first, so terms exist before their
-translations arrive. Push stops at the first error, naming the file.
+early, waits and retries, up to 3 times (after 10, 20, then 30 seconds). Source files go first,
+so terms exist before their translations arrive. Push stops at the first error, naming the file.
 
 **Deleting terms.** A file with `push.sync_terms: true` deletes the project's terms that are
 not in its source file. That is what you want when the source file is the whole truth; leave it
