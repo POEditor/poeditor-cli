@@ -70,9 +70,9 @@ The counts go to stderr; --json also prints them on stdout.`,
 			}
 			var c commentCounts
 			if t := stats.Terms; t != nil {
-				c = commentCounts{Parsed: t.Parsed, Commented: t.WithAddedComment}
+				c = commentCounts{Parsed: t.Parsed, WithAddedComment: t.WithAddedComment}
 			}
-			return report(f, p, asJSON, fmt.Sprintf("Commented on %d of %s in project %s.", c.Commented, nTerms(c.Parsed), p.Label), notFound(c.Parsed-c.Commented), c)
+			return report(f, p, asJSON, fmt.Sprintf("Commented on %d of %s in project %s.", c.WithAddedComment, nTerms(c.Parsed), p.Label), notFound(c.Parsed-c.WithAddedComment), c)
 		},
 	}
 
@@ -86,6 +86,6 @@ The counts go to stderr; --json also prints them on stdout.`,
 
 // commentCounts are the counts of terms/add_comment in --json.
 type commentCounts struct {
-	Parsed    int `json:"parsed"`
-	Commented int `json:"commented"`
+	Parsed           int `json:"parsed"`
+	WithAddedComment int `json:"with_added_comment"`
 }

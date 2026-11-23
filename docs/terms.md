@@ -151,7 +151,7 @@ poeditor api terms add-comment -p web --from-file comments.json
 | `--context <context>` | The term's context. |
 | `--pinned` | Pin the comment. |
 | `--from-file <file>` | Add the comments of a JSON file instead. |
-| `--json` | Print the counts (parsed, commented) as JSON. |
+| `--json` | Print the counts (parsed, with_added_comment) as JSON. |
 
 ```json
 [

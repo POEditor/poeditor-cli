@@ -64,6 +64,10 @@ func TestAddComment_json(t *testing.T) {
 	if res.Err != nil {
 		t.Fatal(res.Err)
 	}
+	// The count keeps the API's name, like the 0/1 values do.
+	if !strings.Contains(res.Stdout, `"with_added_comment": 1`) {
+		t.Errorf("--json: want the API's with_added_comment count, got:\n%s", res.Stdout)
+	}
 	testutil.Golden(t, res.Stdout)
 }
 
