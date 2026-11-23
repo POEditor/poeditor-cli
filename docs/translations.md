@@ -132,4 +132,5 @@ error: 1 of 2 language pairs failed
 ```
 
 When any pair fails, the command exits with an error after printing them all, so a CI job
-notices.
+notices. A pair with nothing left to translate (`No untranslated terms found.`) is
+printed but does not count as failed, so running it on every push is safe.

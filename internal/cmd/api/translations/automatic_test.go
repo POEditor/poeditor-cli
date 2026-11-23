@@ -17,6 +17,10 @@ import (
 const (
 	allTranslated = `{"successful":[{"source":"en","target":"fr","chars":1204},{"source":"en","target":"pt-BR","chars":1180}],"failed":[]}`
 	someFailed    = `{"successful":[{"source":"en","target":"fr","chars":1204}],"failed":[{"source":"en","target":null,"message":"Invalid pair."},{"source":"en","target":"ar","message":"Not enough automatic translation characters."}]}`
+	// The API fails a pair with nothing left to translate; the CLI does not
+	// (a CI job that runs on every push must not fail when nothing is new).
+	nothingNew      = `{"successful":[],"failed":[{"source":"EN","target":"FR","message":"No untranslated terms found."}]}`
+	nothingNewMixed = `{"successful":[],"failed":[{"source":"EN","target":"FR","message":"No untranslated terms found."},{"source":"EN","target":"DE","message":"Target language not found in the project."}]}`
 )
 
 func TestAutomatic_request(t *testing.T) {
@@ -76,6 +80,9 @@ func TestAutomatic_output(t *testing.T) {
 		{"table_failed", someFailed, nil, true, "2 of 3 language pairs failed"},
 		{"json", allTranslated, []string{"--json"}, true, ""},
 		{"json_failed", someFailed, []string{"--json"}, true, "2 of 3 language pairs failed"},
+		{"nothing_new", nothingNew, nil, true, ""},
+		{"nothing_new_and_failed", nothingNewMixed, nil, true, "1 of 2 language pairs failed"},
+		{"json_nothing_new", nothingNew, []string{"--json"}, true, ""},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {

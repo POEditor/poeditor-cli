@@ -41,7 +41,8 @@ terms to translate (with --tags-match: all, any or exclude); --option passes
 a provider option (see the API documentation), e.g. --option format=html.
 
 Each language pair is one line: the characters translated, or why it failed.
-When a pair fails, the command exits 1 after printing them all.`,
+When a pair fails, the command exits 1 after printing them all; a pair with
+nothing left to translate is printed but does not count as failed.`,
 		Example: `  poeditor api translations automatic --project web --provider deepl --source-language en --target fr --target de
   poeditor api translations automatic -p 7717 --provider google --source-language en --target pt-br=pt --tag new
   poeditor api translations automatic -p web --provider microsoft --source-language en --target ro --option format=html --json`,
@@ -66,8 +67,8 @@ When a pair fails, the command exits 1 after printing them all.`,
 			} else if err := printPairs(f, result); err != nil {
 				return err
 			}
-			if n := len(result.Failed); n > 0 {
-				return fmt.Errorf("%d of %d language pairs failed", n, n+len(result.Successful))
+			if n := failedPairs(result); n > 0 {
+				return fmt.Errorf("%d of %d language pairs failed", n, len(result.Failed)+len(result.Successful))
 			}
 			return nil
 		},
@@ -141,6 +142,22 @@ func languagePair(flag, value string) (code, providerCode string, err error) {
 		providerCode = code
 	}
 	return code, providerCode, nil
+}
+
+// nothingToTranslate is the API's reason for a pair whose translations are
+// all filled already: it fails the pair, the CLI does not.
+const nothingToTranslate = "No untranslated terms found."
+
+// failedPairs counts the pairs that failed, leaving out the ones with
+// nothing to translate.
+func failedPairs(r api.AutomaticResult) int {
+	n := 0
+	for _, pr := range r.Failed {
+		if pr.Message != nothingToTranslate {
+			n++
+		}
+	}
+	return n
 }
 
 // printPairs is one line per language pair: the successful ones, then the
