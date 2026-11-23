@@ -43,7 +43,7 @@ Homebrew (macOS and Linux):
 brew install poeditor/tap/poeditor
 ```
 
-Scoop (Windows):
+Scoop (Windows; [install Scoop](https://scoop.sh) first if `scoop` is not recognized):
 
 ```powershell
 scoop bucket add poeditor https://github.com/POEditor/scoop-bucket
