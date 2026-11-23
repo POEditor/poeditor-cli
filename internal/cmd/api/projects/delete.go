@@ -18,14 +18,18 @@ func NewCmdDelete(f *cmdutil.Factory) *cobra.Command {
 	)
 
 	cmd := &cobra.Command{
-		Use:   "delete",
+		Use:   "delete [<project>]",
 		Short: "Delete a project, with all its terms and translations",
 		Long: `Delete a project the account owns: its terms, translations, languages and
 contributors go with it, and this cannot be undone. Without --yes nothing is
 deleted, and the command prints the line to run.`,
-		Example: `  poeditor api projects delete --project 7717 --yes`,
-		Args:    cobra.NoArgs,
-		RunE: func(cmd *cobra.Command, _ []string) error {
+		Example: `  poeditor api projects delete 7717 --yes
+  poeditor api projects delete --project web --yes`,
+		Args: cobra.MaximumNArgs(1),
+		RunE: func(cmd *cobra.Command, args []string) error {
+			if err := projectflag.FromArgs(&project, args); err != nil {
+				return err
+			}
 			if project == "" {
 				return projectflag.ErrMissing
 			}

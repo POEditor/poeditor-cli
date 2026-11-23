@@ -62,7 +62,7 @@ func TestDelete_errors(t *testing.T) {
 		t.Errorf("not logged in: %v", res.Err)
 	}
 	empty := testutil.NewFakeAPI(t)
-	for _, args := range [][]string{{"api", "projects", "delete", "--yes"}, {"api", "projects", "delete", "7717", "--yes"}} {
+	for _, args := range [][]string{{"api", "projects", "delete", "--yes"}, {"api", "projects", "delete", "7717", "9001", "--yes"}} {
 		if res := testutil.Run(t, empty, args...); res.Err == nil {
 			t.Errorf("%v: no error", args)
 		}

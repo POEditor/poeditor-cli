@@ -15,16 +15,20 @@ func NewCmdView(f *cmdutil.Factory) *cobra.Command {
 	)
 
 	cmd := &cobra.Command{
-		Use:   "view",
+		Use:   "view [<project>]",
 		Short: "Show a project's details",
 		Long: `Show a project: name, description, reference and fallback languages, public
 and open flags, how many terms it has, when terms were last added and updated
 (T ADDED, T UPDATED) and when the project was created. One row, as in
 ` + "`poeditor api projects list`" + `; piped, one tab-separated line.`,
-		Example: `  poeditor api projects view --project web
-  poeditor api projects view -p 7717 --json`,
-		Args: cobra.NoArgs,
-		RunE: func(cmd *cobra.Command, _ []string) error {
+		Example: `  poeditor api projects view web
+  poeditor api projects view 7717 --json
+  poeditor api projects view --project web`,
+		Args: cobra.MaximumNArgs(1),
+		RunE: func(cmd *cobra.Command, args []string) error {
+			if err := projectflag.FromArgs(&project, args); err != nil {
+				return err
+			}
 			p, err := projectflag.Resolve(f, project)
 			if err != nil {
 				return err

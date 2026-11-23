@@ -29,7 +29,7 @@ func NewCmdUpdate(f *cmdutil.Factory) *cobra.Command {
 	)
 
 	cmd := &cobra.Command{
-		Use:   "update",
+		Use:   "update [<project>]",
 		Short: "Change a project's name, description, languages or proofreading",
 		Long: `Change a project's settings. Only the flags given change; --reference-language ""
 or --fallback-language "" clears that language. A language must be one of the
@@ -41,9 +41,12 @@ keeps contributors from changing proofread translations.
 --json prints the project as it is after the change.`,
 		Example: `  poeditor api projects update --project web --name "Web (2026)"
   poeditor api projects update -p 7717 --reference-language en --fallback-language ""
-  poeditor api projects update -p web --proofreading on --lock-proofread on`,
-		Args: cobra.NoArgs,
-		RunE: func(cmd *cobra.Command, _ []string) error {
+  poeditor api projects update web --proofreading on --lock-proofread on`,
+		Args: cobra.MaximumNArgs(1),
+		RunE: func(cmd *cobra.Command, args []string) error {
+			if err := projectflag.FromArgs(&project, args); err != nil {
+				return err
+			}
 			u, err := projectUpdate(cmd, name, description, reference, fallback, proofreading, lockProofread)
 			if err != nil {
 				return err

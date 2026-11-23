@@ -30,6 +30,20 @@ func Add(cmd *cobra.Command, value *string) {
 	cmd.MarkFlagsMutuallyExclusive("project", "id")
 }
 
+// FromArgs takes the project from the command's optional argument, the other
+// spelling of --project (`poeditor api projects view 7717`) for commands whose
+// subject is the project. Giving both is refused, even when they agree.
+func FromArgs(value *string, args []string) error {
+	if len(args) == 0 {
+		return nil
+	}
+	if *value != "" {
+		return errors.New("give the project once: as an argument or with --project, not both")
+	}
+	*value = args[0]
+	return nil
+}
+
 // ErrMissing is returned by Resolve when neither --project nor --id was given.
 var ErrMissing = errors.New(`required flag "--project" not set (the project's alias in .poeditor.yml, or its id)`)
 

@@ -52,6 +52,10 @@ ID     NAME  DESCRIPTION         REFERENCE  FALLBACK  PUBLIC  OPEN  TERMS  T ADD
 Piped, it prints one tab-separated line, with dates in the API's format. `--json` prints the
 project as JSON.
 
+The project is the argument or `--project` (its alias in `.poeditor.yml`, or its id), as in
+`projects update` and `projects delete`: `poeditor api projects view 12345`. Giving both is an
+error.
+
 ## `poeditor api projects add`
 
 Create a project owned by the account. It starts with no languages: add them with
@@ -77,8 +81,10 @@ Change a project's settings. Only the flags you give change; giving none is an e
 ```sh
 poeditor api projects update --project web --name "Web (2026)"
 poeditor api projects update -p 12345 --reference-language en --fallback-language ""
-poeditor api projects update -p web --proofreading on --lock-proofread on
+poeditor api projects update web --proofreading on --lock-proofread on
 ```
+
+The project is the argument or `--project`, as in `projects view`.
 
 | Flag | |
 |---|---|
@@ -100,7 +106,8 @@ contributors. This cannot be undone, so it needs `--yes`: without it nothing is 
 command prints the line to run.
 
 ```sh
-poeditor api projects delete --project 12345 --yes
+poeditor api projects delete 12345 --yes
+poeditor api projects delete --project web --yes
 ```
 
 ## `poeditor api projects export`

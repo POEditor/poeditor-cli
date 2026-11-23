@@ -172,3 +172,25 @@ func TestAdd_helpNamesID(t *testing.T) {
 		t.Errorf("--id 7717 → %q, %v", project, err)
 	}
 }
+
+func TestFromArgs(t *testing.T) {
+	tests := []struct {
+		name, flag string
+		args       []string
+		want       string
+		wantErr    bool
+	}{
+		{"no argument keeps the flag", "web", nil, "web", false},
+		{"the argument", "", []string{"7717"}, "7717", false},
+		{"both", "web", []string{"7717"}, "web", true},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			value := tt.flag
+			err := projectflag.FromArgs(&value, tt.args)
+			if (err != nil) != tt.wantErr || value != tt.want {
+				t.Errorf("value = %q, err = %v", value, err)
+			}
+		})
+	}
+}
