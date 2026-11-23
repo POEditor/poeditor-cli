@@ -4,7 +4,6 @@ import (
 	"context"
 	"errors"
 	"fmt"
-	"slices"
 	"strings"
 
 	"github.com/spf13/cobra"
@@ -76,13 +75,15 @@ proofreader), it says so and succeeds.`,
 }
 
 // nothingToRemove turns the API's "not assigned" answers into a line, so
-// removing twice is not a failure; any other error comes back as it is.
-// "Not assigned to this language" also answers a language the project lacks,
-// which only the project's languages tell apart.
+// removing twice is not a failure. A wrong --language code (4043) or one the
+// project lacks (4044) is explained; any other error comes back as it is.
 func nothingToRemove(ctx context.Context, p projectflag.Project, email string, r api.ContributorRemoval, err error) (string, error) {
 	var apiErr *api.Error
-	if !errors.As(err, &apiErr) || apiErr.Code != api.CodeCustomMessage {
+	if !errors.As(err, &apiErr) {
 		return "", err
+	}
+	if apiErr.Code != api.CodeCustomMessage {
+		return "", p.LanguageError(ctx, "--language "+r.Language, err)
 	}
 	switch apiErr.Message {
 	case api.MsgNotInProject:
@@ -90,13 +91,6 @@ func nothingToRemove(ctx context.Context, p projectflag.Project, email string, r
 	case api.MsgNotProofreader:
 		return fmt.Sprintf("%s is not a proofreader in project %s.", email, p.Label), nil
 	case api.MsgNotInLanguage:
-		codes, listErr := p.Client.LanguageCodes(ctx, p.ID)
-		if listErr != nil {
-			return "", err
-		}
-		if !slices.ContainsFunc(codes, func(c string) bool { return strings.EqualFold(c, r.Language) }) {
-			return "", p.LanguageError(ctx, "--language "+r.Language, &api.Error{Code: api.CodeLanguageNotInProject})
-		}
 		return fmt.Sprintf("%s is not in %s in project %s.", email, r.Language, p.Label), nil
 	}
 	return "", err

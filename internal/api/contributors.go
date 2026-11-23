@@ -88,8 +88,8 @@ type ContributorRemoval struct {
 
 // The 4040 messages of contributors/remove that mean there was nothing to
 // remove (server: ApiV2_Contributors_Remove::removeUser,
-// Project::deleteProofreader). The language one also answers a language the
-// project lacks, or a wrong code: the server overwrites 4043/4044 with it.
+// Project::deleteProofreader). A wrong language code is 4043, one the
+// project lacks 4044, as everywhere else.
 const (
 	MsgNotInProject   = "The contributor is not assigned to this project."
 	MsgNotProofreader = "This user is not a proofreader in this project."

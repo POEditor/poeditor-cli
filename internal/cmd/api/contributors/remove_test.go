@@ -124,7 +124,6 @@ func TestRemove_nothingToRemove(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			fake := testutil.NewFakeAPI(t)
 			fake.Stub("contributors/remove", testutil.Fail("4040", tt.message))
-			fake.Stub("languages/list", testutil.OK(map[string]any{"languages": []map[string]any{{"code": "en"}, {"code": "fr"}}}))
 
 			res := testutil.Run(t, fake, append([]string{"api", "contributors", "remove", "ana@example.com", "-p", "7717", "--yes"}, tt.args...)...)
 
@@ -134,6 +133,7 @@ func TestRemove_nothingToRemove(t *testing.T) {
 			if res.Stdout != "" || res.Stderr != tt.wantStderr {
 				t.Errorf("stdout = %q, stderr = %q, want %q", res.Stdout, res.Stderr, tt.wantStderr)
 			}
+			fake.OnlyRequest(t) // the answer alone says it: no languages/list
 		})
 	}
 }
@@ -150,11 +150,21 @@ func TestRemove_apiErrors(t *testing.T) {
 			t.Errorf("error = %v, stderr = %q", res.Err, res.Stderr)
 		}
 	})
-	// The server answers a language the project lacks (or a wrong code) with
-	// "not assigned to this language" too: the project's languages tell them apart.
+	// A wrong code (4043) or a language the project lacks (4044) is the
+	// language's fault, not "nothing to remove".
+	t.Run("a wrong language code", func(t *testing.T) {
+		fake := testutil.NewFakeAPI(t)
+		fake.Stub("contributors/remove", testutil.Fail(api.CodeUnknownLanguage, "Invalid language code."))
+
+		res := testutil.Run(t, fake, "api", "contributors", "remove", "ana@example.com", "-p", "7717", "-l", "xx", "--yes")
+
+		if res.Err == nil || !strings.HasPrefix(res.Err.Error(), "--language xx: not a language code POEditor knows") || res.Stderr != "" {
+			t.Errorf("error = %v, stderr = %q", res.Err, res.Stderr)
+		}
+	})
 	t.Run("a language the project does not have", func(t *testing.T) {
 		fake := testutil.NewFakeAPI(t)
-		fake.Stub("contributors/remove", testutil.Fail("4040", "The contributor is not assigned to this language."))
+		fake.Stub("contributors/remove", testutil.Fail(api.CodeLanguageNotInProject, "Language not found in project."))
 		fake.Stub("languages/list", testutil.OK(map[string]any{"languages": []map[string]any{{"code": "en"}, {"code": "fr"}}}))
 
 		res := testutil.Run(t, fake, "api", "contributors", "remove", "ana@example.com", "-p", "7717", "-l", "de", "--yes")
