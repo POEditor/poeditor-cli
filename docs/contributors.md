@@ -68,3 +68,7 @@ poeditor api contributors remove ana@example.com -p web --proofreader --yes
 | `--yes` | Remove. |
 
 Only the project's owner can remove an administrator.
+
+Removing someone who has nothing to remove (not in the project, not in that language, not a
+proofreader) prints `ana@example.com is not in project web.` and succeeds, so a cleanup script
+can run twice.

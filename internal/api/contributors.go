@@ -86,6 +86,17 @@ type ContributorRemoval struct {
 	Proofreader bool   // only the proofreader right
 }
 
+// The 4040 messages of contributors/remove that mean there was nothing to
+// remove (server: ApiV2_Contributors_Remove::removeUser,
+// Project::deleteProofreader). The language one also answers a language the
+// project lacks, or a wrong code: the server overwrites 4043/4044 with it.
+const (
+	MsgNotInProject   = "The contributor is not assigned to this project."
+	MsgNotProofreader = "This user is not a proofreader in this project."
+	MsgNotInLanguage  = "The contributor is not assigned to this language."
+	CodeCustomMessage = "4040"
+)
+
 // ContributorsRemove calls contributors/remove.
 func (c *Client) ContributorsRemove(ctx context.Context, projectID int, email string, r ContributorRemoval) error {
 	params := url.Values{"id": {idParam(projectID)}, "email": {email}}

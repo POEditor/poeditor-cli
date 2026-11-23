@@ -1,7 +1,10 @@
 package contributors
 
 import (
+	"context"
+	"errors"
 	"fmt"
+	"slices"
 	"strings"
 
 	"github.com/spf13/cobra"
@@ -27,7 +30,9 @@ func NewCmdRemove(f *cmdutil.Factory) *cobra.Command {
 the project owner can remove), one language with --language, or only the
 proofreader right with --proofreader.
 
-Without --yes nothing is removed, and the command prints the line to run.`,
+Without --yes nothing is removed, and the command prints the line to run.
+When there is nothing to remove (not in the project, the language, or not a
+proofreader), it says so and succeeds.`,
 		Example: `  poeditor api contributors remove ana@example.com --project web --yes
   poeditor api contributors remove ana@example.com -p 7717 --language fr --yes
   poeditor api contributors remove ana@example.com -p web --proofreader --yes`,
@@ -49,7 +54,12 @@ Without --yes nothing is removed, and the command prints the line to run.`,
 				return err
 			}
 			if err := p.Client.ContributorsRemove(cmd.Context(), p.ID, email, r); err != nil {
-				return err
+				absent, err := nothingToRemove(cmd.Context(), p, email, r, err)
+				if err != nil {
+					return err
+				}
+				fmt.Fprintln(f.IO.ErrOut, absent)
+				return nil
 			}
 			fmt.Fprintf(f.IO.ErrOut, "Removed %s.\n", removal(email, p.Label, r))
 			return nil
@@ -63,6 +73,33 @@ Without --yes nothing is removed, and the command prints the line to run.`,
 	cmd.MarkFlagsMutuallyExclusive("language", "proofreader")
 	cmdutil.MarkAction(cmd)
 	return cmd
+}
+
+// nothingToRemove turns the API's "not assigned" answers into a line, so
+// removing twice is not a failure; any other error comes back as it is.
+// "Not assigned to this language" also answers a language the project lacks,
+// which only the project's languages tell apart.
+func nothingToRemove(ctx context.Context, p projectflag.Project, email string, r api.ContributorRemoval, err error) (string, error) {
+	var apiErr *api.Error
+	if !errors.As(err, &apiErr) || apiErr.Code != api.CodeCustomMessage {
+		return "", err
+	}
+	switch apiErr.Message {
+	case api.MsgNotInProject:
+		return fmt.Sprintf("%s is not in project %s.", email, p.Label), nil
+	case api.MsgNotProofreader:
+		return fmt.Sprintf("%s is not a proofreader in project %s.", email, p.Label), nil
+	case api.MsgNotInLanguage:
+		codes, listErr := p.Client.LanguageCodes(ctx, p.ID)
+		if listErr != nil {
+			return "", err
+		}
+		if !slices.ContainsFunc(codes, func(c string) bool { return strings.EqualFold(c, r.Language) }) {
+			return "", p.LanguageError(ctx, "--language "+r.Language, &api.Error{Code: api.CodeLanguageNotInProject})
+		}
+		return fmt.Sprintf("%s is not in %s in project %s.", email, r.Language, p.Label), nil
+	}
+	return "", err
 }
 
 // removal says what goes: "ana@example.com from project web", "… from fr in
