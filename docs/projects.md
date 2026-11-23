@@ -59,11 +59,14 @@ Create a project owned by the account. It starts with no languages: add them wit
 
 ```sh
 poeditor api projects add "Mobile app"
-poeditor api projects add Web --description "The marketing site" --json
+poeditor api projects add --name Web --description "The marketing site" --json
 ```
+
+The name is the argument or `--name`, as in `projects update`; giving both is an error.
 
 | Flag | |
 |---|---|
+| `--name <name>` | The project's name, instead of the argument. |
 | `--description <text>` | The project's description. |
 | `--json` | Print the new project as JSON. Its id is always on stderr. |
 

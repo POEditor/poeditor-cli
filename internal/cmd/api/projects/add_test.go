@@ -19,6 +19,7 @@ func TestAdd(t *testing.T) {
 	}{
 		{"name only", []string{"Mobile app"}, map[string]string{"name": "Mobile app", "description": ""}, false},
 		{"description, json", []string{" Mobile app ", "--description", "The app", "--json"}, map[string]string{"name": "Mobile app", "description": "The app"}, true},
+		{"--name", []string{"--name", " Mobile app "}, map[string]string{"name": "Mobile app", "description": ""}, false},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
@@ -54,10 +55,19 @@ func TestAdd(t *testing.T) {
 
 func TestAdd_errors(t *testing.T) {
 	empty := testutil.NewFakeAPI(t)
-	for _, args := range [][]string{{"api", "projects", "add"}, {"api", "projects", "add", " "}, {"api", "projects", "add", "a", "b"}} {
+	for _, args := range [][]string{{"api", "projects", "add"}, {"api", "projects", "add", " "}, {"api", "projects", "add", "a", "b"},
+		{"api", "projects", "add", "--name", " "}, {"api", "projects", "add", "a", "--name", "b"}} {
 		if res := testutil.Run(t, empty, args...); res.Err == nil {
 			t.Errorf("%v: no error", args)
 		}
+	}
+	both := testutil.Run(t, empty, "api", "projects", "add", "a", "--name", "b")
+	if both.Err == nil || both.Err.Error() != "give the project name once: as an argument or with --name, not both" {
+		t.Errorf("name twice: %v", both.Err)
+	}
+	none := testutil.Run(t, empty, "api", "projects", "add")
+	if none.Err == nil || none.Err.Error() != "the project name is missing: poeditor api projects add <name> (or --name <name>)" {
+		t.Errorf("no name: %v", none.Err)
 	}
 	if n := len(empty.Requests()); n != 0 {
 		t.Errorf("%d requests for bad arguments", n)
